@@ -138,6 +138,37 @@
     (should (equal "New" (cmdr-test-keys--raw-label (keymap-lookup map "C-c") "a")))
     (should (eq #'ignore (keymap-lookup map "C-c a f")))))
 
+(ert-deftest cmdr-keys-test/prefix-rejects-non-string-label ()
+  "A prefix label must be a string, and the map is left untouched."
+  (let ((map (make-sparse-keymap)))
+    (should-error (cmdr-keys-prefix map "C-c a" nil) :type 'user-error)
+    (should-error (cmdr-keys-prefix map "C-c a" 'label) :type 'user-error)
+    (should-not (lookup-key map (kbd "C-c")))))
+
+(ert-deftest cmdr-keys-test/set-refuses-to-replace-a-prefix ()
+  "Binding a command onto an existing prefix signals and keeps the prefix."
+  (let ((map (make-sparse-keymap)))
+    (cmdr-keys-prefix map "C-c a" "Apps")
+    (should-error (cmdr-keys-set map "C-c a" #'ignore) :type 'user-error)
+    (should (keymapp (lookup-key map (kbd "C-c a"))))))
+
+(ert-deftest cmdr-keys-test/set-creates-intermediate-prefixes-and-rebinds ()
+  "Setting a full sequence creates parents; setting it again replaces the command."
+  (let ((map (make-sparse-keymap)))
+    (cmdr-keys-set map "C-c a b" #'ignore)
+    (should (keymapp (lookup-key map (kbd "C-c a"))))
+    (cmdr-keys-set map "C-c a b" #'next-line)
+    (should (eq #'next-line (lookup-key map (kbd "C-c a b"))))))
+
+(ert-deftest cmdr-keys-test/prefix-on-sparse-label-update-keeps-bindings ()
+  "Relabelling a prefix keeps commands already bound beneath it."
+  (let ((map (make-sparse-keymap)))
+    (cmdr-keys-set map "C-c a b" #'ignore)
+    (cmdr-keys-prefix map "C-c a" "Apps")
+    (cmdr-keys-prefix map "C-c a" "Applications")
+    (should (eq #'ignore (lookup-key map (kbd "C-c a b"))))
+    (should (equal "Applications" (cadr (assq ?a (cdr (lookup-key map (kbd "C-c")))))))))
+
 (ert-deftest cmdr-keys-test/reload-idempotent ()
   (cmdr-test-keys--with-clean-root
     (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
