@@ -19,6 +19,12 @@
 (require 'cmdr-keys)
 (require 'cmdr-mode)
 
+;; Help and `where-is-internal' machinery in other tests can touch
+;; `global-map' on their own, so loading is checked here, at load time.
+(defvar cmdr-test-keys--load-left-global-map-intact
+  (equal cmdr-test-keys--global-snapshot global-map)
+  "Non-nil when requiring cmdr-keys and cmdr-mode left `global-map' equal.")
+
 (defun cmdr-test-keys--raw-label (map key)
   "Return the native menu-item label stored for single KEY in MAP."
   (let ((binding (assq (aref (key-parse key) 0) (cdr map))))
@@ -71,7 +77,7 @@
     (should (eq #'ignore (keymap-lookup map "C-c a b f")))
     (should (equal "Apps" (cmdr-test-keys--raw-label (keymap-lookup map "C-c") "a")))
     (should (equal "Browse" (cmdr-test-keys--raw-label (keymap-lookup map "C-c a") "b")))
-    (should (member (kbd "C-c a b f") (where-is-internal #'ignore map)))))
+    (should (member (key-parse "C-c a b f") (where-is-internal #'ignore map)))))
 
 (ert-deftest cmdr-keys-test/help-describes-labelled-prefix ()
   (let ((map (make-sparse-keymap)))
@@ -79,12 +85,12 @@
     (cmdr-keys-set map "C-c a f" #'ignore)
     (with-temp-buffer
       (use-local-map map)
-      (let ((out (generate-new-buffer " *cmdr-help*")))
+      (let* ((subject (current-buffer))
+             (out (generate-new-buffer " *cmdr-help*")))
         (unwind-protect
-            (progn
-              (describe-buffer-bindings out)
-              (with-current-buffer out
-                (should (string-match-p "C-c a f" (buffer-string)))))
+            (with-current-buffer out
+              (describe-buffer-bindings subject)
+              (should (string-match-p "C-c a f" (buffer-string))))
           (kill-buffer out))))))
 
 (ert-deftest cmdr-keys-test/prefix-reuses-existing-submap ()
@@ -170,12 +176,14 @@
       (should (eq #'previous-line (key-binding (kbd "C-c z")))))))
 
 (ert-deftest cmdr-mode-test/global-map-unchanged ()
-  (cmdr-test-keys--with-clean-root
-    (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
-    (cmdr-keys-set cmdr-mode-map "C-c a f" #'ignore)
-    (cmdr-mode 1)
-    (cmdr-mode -1)
-    (should (equal cmdr-test-keys--global-snapshot global-map))))
+  (should cmdr-test-keys--load-left-global-map-intact)
+  (let ((before (copy-tree global-map)))
+    (cmdr-test-keys--with-clean-root
+      (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
+      (cmdr-keys-set cmdr-mode-map "C-c a f" #'ignore)
+      (cmdr-mode 1)
+      (cmdr-mode -1)
+      (should (equal before global-map)))))
 
 (ert-deftest cmdr-keys-test/which-key-not-required ()
   (should-not (featurep 'which-key)))
