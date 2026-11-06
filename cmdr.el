@@ -1,4 +1,4 @@
-;;; cmdr.el --- Command registry with Transient and completing-read frontends -*- lexical-binding: t; -*-
+;;; cmdr.el --- Command registry with Transient and ACR frontends -*- lexical-binding: t; -*-
 
 ;; Author: sam kleinman <sam@tychoish.com>
 ;; Maintainer: sam kleinman <sam@tychoish.com>

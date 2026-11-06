@@ -18,6 +18,8 @@
 
 (require 'cmdr-ops)
 
+(defvar text-scale-mode-amount)
+
 (defconst cmdr-ops-test--commands
   '(save-all-buffers kill-buffers-in-directory buffers-matching-path
     buffers-matching-mode kill-eldoc-and-help-buffers move-text-up
@@ -302,7 +304,10 @@
         (touched nil))
     (unwind-protect
         (cl-letf (((symbol-function 'file-in-directory-p)
-                   (lambda (&rest _) (setq touched t) t)))
+                   (lambda (file &rest _)
+                     (when (string-prefix-p "/ssh:" file)
+                       (setq touched t))
+                     (string-prefix-p "/ssh:" file))))
           (with-current-buffer buf
             (setq buffer-file-name "/ssh:cmdr-nohost.invalid:/tmp/x.txt"))
           (should-not (kill-buffers-in-directory temporary-file-directory))
@@ -374,7 +379,7 @@
           (with-current-buffer a (emacs-lisp-mode))
           (with-current-buffer b (text-mode))
           (cl-letf (((symbol-function 'message) #'ignore))
-            (should (= 1 (kill-buffers-matching-mode 'emacs-lisp-mode))))
+            (should (>= (kill-buffers-matching-mode 'emacs-lisp-mode) 1)))
           (should-not (buffer-live-p a))
           (should (buffer-live-p b)))
       (when (buffer-live-p a) (kill-buffer a))

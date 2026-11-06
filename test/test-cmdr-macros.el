@@ -196,6 +196,8 @@
     (should (string-match-p "setq-local" (prin1-to-string expansion))))
   (should-error (macroexpand-1 '(create-toggle-functions v :keymap m)) :type 'user-error))
 
+(declare-function turn-on-compiled "test-cmdr-macros")
+
 (ert-deftest cmdr-macros-test/toggle-functions-compiled ()
   "Expansion works when byte-compiled."
   (let ((cmdr-test--flag nil)
