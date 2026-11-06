@@ -103,7 +103,7 @@ CLEANUP or MAKE-UNIQUE also unintern the generated function."
                 (if args
                     `(funcall ,operation ,@call-args)
                   `(funcall ,operation)))
-               ((symbolp function)
+               ((and function (symbolp function))
                 (if args
                     `(funcall ',function ,@call-args)
                   `(funcall ',function)))
@@ -164,7 +164,7 @@ Use SHORT-NAME to override the generated name.  LOCAL makes the commands use
           `(keymap-set ,keymap ,key #',(car (nth 2 ops)))))))
 
 (cl-defmacro make-read-extended-command-for-prefix (prefix &key bind-map bind-key key-alias)
-  "Define an interactive command running `execute-extended-command' filtered to PREFIX.
+  "Define a command running `execute-extended-command' filtered to PREFIX.
 Only commands whose names begin with PREFIX are offered for completion.
 Optionally bind the command to BIND-KEY in BIND-MAP (default `global-map')
 labeled KEY-ALIAS."
@@ -192,6 +192,54 @@ labeled KEY-ALIAS."
           `(keymap-set ,(or bind-map 'global-map) ,bind-key
                        (cons ,(or key-alias (format "%s-commands" prefix))
                              #',user-command-symbol))))))
+
+(defun cmdr--deferred-keymap-activate (map key package keymap-symbol name stand-in)
+  "Load PACKAGE for the deferred binding of KEY in MAP, then replay the keys.
+KEYMAP-SYMBOL must hold a keymap once PACKAGE loads; otherwise signal a
+`user-error' and leave STAND-IN installed so a later use can retry.  KEY
+is only rebound, labeled NAME, if it is still bound to STAND-IN."
+  (require package)
+  (let ((real-map (and (boundp keymap-symbol) (symbol-value keymap-symbol))))
+    (unless (keymapp real-map)
+      (user-error "Package `%s' did not define `%s' as a keymap" package keymap-symbol))
+    (when (eq (lookup-key map (key-parse key)) stand-in)
+      (keymap-set map key (cons name real-map))))
+  (setq unread-command-events
+        (append (listify-key-sequence (this-command-keys-vector))
+                unread-command-events)))
+
+(defmacro cmdr-bind-deferred-keymap (map key package keymap-symbol name)
+  "Bind KEY in MAP to a labeled stand-in that loads PACKAGE on first use.
+All arguments are evaluated exactly once, when the binding is installed;
+PACKAGE and KEYMAP-SYMBOL evaluate to symbols and PACKAGE is not loaded
+at expansion or install time.  KEY is the full key sequence relative to
+MAP.  NAME is the label stored in the binding.
+
+On first use the stand-in requires PACKAGE, checks that KEYMAP-SYMBOL's
+value is a keymap, rebinds KEY to that keymap (keeping NAME) only if KEY
+is still bound to the stand-in, and replays the invoking key sequence so
+it falls through to the real map.  If loading or validation fails, the
+stand-in stays installed, nothing is replayed, and a later use retries.
+Returns the stand-in command."
+  (let ((map-var (gensym "map"))
+        (key-var (gensym "key"))
+        (package-var (gensym "package"))
+        (symbol-var (gensym "keymap-symbol"))
+        (name-var (gensym "name"))
+        (stand-in (gensym "stand-in")))
+    `(let* ((,map-var ,map)
+            (,key-var ,key)
+            (,package-var ,package)
+            (,symbol-var ,keymap-symbol)
+            (,name-var ,name)
+            (,stand-in nil))
+       (setq ,stand-in
+             (lambda ()
+               (interactive)
+               (cmdr--deferred-keymap-activate
+                ,map-var ,key-var ,package-var ,symbol-var ,name-var ,stand-in)))
+       (keymap-set ,map-var ,key-var (cons ,name-var ,stand-in))
+       ,stand-in)))
 
 (provide 'cmdr-macros)
 ;;; cmdr-macros.el ends here
