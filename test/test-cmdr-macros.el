@@ -341,5 +341,137 @@
       (should (equal (cadr (assq ?x (cdr map))) "lbl"))
       (should (eq (cddr (assq ?x (cdr map))) (symbol-value 'cmdr-test-pkg-e-map))))))
 
+(defvar cmdr-test--bumps nil)
+
+(defun cmdr-test--bump (&rest args)
+  "Record a call with ARGS."
+  (push args cmdr-test--bumps))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-body-runs-all-forms ()
+  (let ((cmdr-test--hook nil)
+        (n 0))
+    (add-one-shot-hook :name "body" :hook 'cmdr-test--hook
+                       :body ((cl-incf n) (cl-incf n 10)))
+    (run-hooks 'cmdr-test--hook)
+    (should (= n 11))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-result-is-evaluated-at-expansion ()
+  (let ((cmdr-test--hook nil)
+        (n 0))
+    (add-one-shot-hook :name "result" :hook 'cmdr-test--hook :result '(cl-incf n 5))
+    (run-hooks 'cmdr-test--hook)
+    (should (= n 5))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-operation-with-and-without-args ()
+  (let ((cmdr-test--hook nil)
+        (cmdr-test--hook-b nil)
+        (cmdr-test--bumps nil))
+    (add-one-shot-hook :name "op0" :hook 'cmdr-test--hook :operation #'cmdr-test--bump)
+    (add-one-shot-hook :name "op1" :hook 'cmdr-test--hook-b :operation #'cmdr-test--bump
+                       :args (x &optional y))
+    (run-hooks 'cmdr-test--hook)
+    (run-hook-with-args 'cmdr-test--hook-b 1 2)
+    (should (equal '((1 2) nil) cmdr-test--bumps))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-function-symbol-with-and-without-args ()
+  (let ((cmdr-test--hook nil)
+        (cmdr-test--hook-b nil)
+        (cmdr-test--bumps nil))
+    (add-one-shot-hook :name "fn0" :hook 'cmdr-test--hook :function cmdr-test--bump)
+    (add-one-shot-hook :name "fn1" :hook 'cmdr-test--hook-b :function cmdr-test--bump :args (x))
+    (run-hooks 'cmdr-test--hook)
+    (run-hook-with-args 'cmdr-test--hook-b 7)
+    (should (equal '((7) nil) cmdr-test--bumps))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-function-sharp-quote-calls-function ()
+  "Regression: `:function #\\='sym' calls SYM instead of evaluating to it."
+  (let ((cmdr-test--hook nil)
+        (cmdr-test--bumps nil))
+    (add-one-shot-hook :name "sharp" :hook 'cmdr-test--hook :function #'cmdr-test--bump)
+    (run-hooks 'cmdr-test--hook)
+    (should (equal '(nil) cmdr-test--bumps))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-function-call-form-is-evaluated ()
+  (let ((cmdr-test--hook nil)
+        (n 0))
+    (add-one-shot-hook :name "form-fn" :hook 'cmdr-test--hook :function (cl-incf n))
+    (run-hooks 'cmdr-test--hook)
+    (should (= n 1))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-cleanup-and-make-unique-unintern ()
+  (let ((cmdr-test--hook nil)
+        (cmdr-test--hook-b nil))
+    (add-one-shot-hook :name "clean" :hook 'cmdr-test--hook :cleanup t :form (ignore))
+    (add-one-shot-hook :name "uniq" :hook 'cmdr-test--hook-b :make-unique t :form (ignore))
+    (let ((names (list (symbol-name (car cmdr-test--hook))
+                       (symbol-name (car cmdr-test--hook-b)))))
+      (should (seq-every-p #'intern-soft names))
+      (run-hooks 'cmdr-test--hook 'cmdr-test--hook-b)
+      (should-not (seq-some #'intern-soft names)))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-computed-hook-expression ()
+  "A hook given as an expression is evaluated, and quoted lists are accepted."
+  (let ((cmdr-test--hook nil)
+        (cmdr-test--hook-b nil)
+        (n 0))
+    (add-one-shot-hook :name "computed" :hook (list 'cmdr-test--hook) :form (cl-incf n))
+    (add-one-shot-hook :name "quoted" :hook '(cmdr-test--hook-b) :form (cl-incf n))
+    (run-hooks 'cmdr-test--hook 'cmdr-test--hook-b)
+    (should (= n 2))
+    (should-not (or cmdr-test--hook cmdr-test--hook-b))))
+
+(ert-deftest cmdr-macros-test/one-shot-hook-first-frame-sentinel ()
+  "The `after-first-frame-created' sentinel resolves per daemon status."
+  (let ((window-setup-hook nil)
+        (server-after-make-frame-hook nil)
+        (n 0))
+    (add-one-shot-hook :name "frame" :hook after-first-frame-created :form (cl-incf n))
+    (if (daemonp)
+        (should server-after-make-frame-hook)
+      (should window-setup-hook))))
+
+(ert-deftest cmdr-macros-test/resolve-hooks-rejects-bad-input ()
+  (should-error (cmdr--resolve-hooks '(a "b")) :type 'user-error)
+  (should-error (cmdr--resolve-hooks 5) :type 'user-error)
+  (should (equal '(a b) (cmdr--resolve-hooks '(a b)))))
+
+(ert-deftest cmdr-macros-test/toggle-functions-require-key-with-keymap ()
+  (should-error (macroexpand-1 '(create-toggle-functions some-var :keymap some-map))
+                :type 'user-error))
+
+(ert-deftest cmdr-macros-test/extended-command-default-key-alias ()
+  "Without KEY-ALIAS the binding is labelled \"PREFIX-commands\" in `global-map' by default."
+  (let ((form (macroexpand-1 '(make-read-extended-command-for-prefix "zzz" :bind-key "x"))))
+    (should (string-match-p "global-map" (format "%S" form)))
+    (should (string-match-p "zzz-commands" (format "%S" form)))))
+
+(ert-deftest cmdr-macros-test/extended-command-runs-with-prefix-predicate ()
+  (let ((seen nil))
+    (cl-letf (((symbol-function 'execute-extended-command)
+               (lambda (&rest _) (setq seen read-extended-command-predicate))))
+      (execute-extended-cmdr-test-command))
+    (should (eq seen 'read-extended-command-for-cmdr-test-prefix-p))))
+
+(ert-deftest cmdr-macros-test/deferred-nested-key-sequence ()
+  "A multi-key sequence is bound beneath its prefix and swapped in place."
+  (cmdr-test--with-package-dir
+    (cmdr-test--write-package 'cmdr-test-pkg-e 'cmdr-test-pkg-e-map "(make-sparse-keymap)")
+    (let* ((map (make-sparse-keymap))
+           (stand-in (cmdr-bind-deferred-keymap map "C-c e" 'cmdr-test-pkg-e 'cmdr-test-pkg-e-map "E")))
+      (should (eq stand-in (lookup-key map (kbd "C-c e"))))
+      (funcall stand-in)
+      (should (eq (symbol-value 'cmdr-test-pkg-e-map) (lookup-key map (kbd "C-c e"))))
+      (should (equal "E" (cadr (assq ?e (cdr (lookup-key map (kbd "C-c"))))))))))
+
+(ert-deftest cmdr-macros-test/deferred-second-use-after-swap-is-not-redirected ()
+  "Calling the stand-in again after the swap leaves the real map in place."
+  (cmdr-test--with-package-dir
+    (cmdr-test--write-package 'cmdr-test-pkg-f 'cmdr-test-pkg-f-map "(make-sparse-keymap)")
+    (let* ((map (make-sparse-keymap))
+           (stand-in (cmdr-bind-deferred-keymap map "x" 'cmdr-test-pkg-f 'cmdr-test-pkg-f-map "F")))
+      (funcall stand-in)
+      (funcall stand-in)
+      (should (eq (symbol-value 'cmdr-test-pkg-f-map) (cmdr-test--stand-in map "x"))))))
+
 (provide 'test-cmdr-macros)
 ;;; test-cmdr-macros.el ends here

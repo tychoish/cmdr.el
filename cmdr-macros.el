@@ -106,6 +106,8 @@ CLEANUP or MAKE-UNIQUE also unintern the generated function."
                 (if args
                     `(funcall ',function ,@call-args)
                   `(funcall ',function)))
+               ((memq (car-safe function) '(function quote))
+                `(funcall ,function ,@call-args))
                ((listp function)
                 function))
               (user-error "Could not resolve the hook function from input for %s" name)))
