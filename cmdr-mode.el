@@ -27,6 +27,7 @@
   "Attach `cmdr-mode-map' as a global minor-mode map.
 Does nothing else: no display, completion, hooks, advice or frame policy."
   :global t
+  :group 'convenience
   :keymap cmdr-mode-map)
 
 (provide 'cmdr-mode)
