@@ -403,7 +403,9 @@ LABEL may be a function called with the candidate table."
   (let ((cmdr-command-table nil))
     (cmdr-register-command :category 'g :command 'foo :description "f"
                            :if (lambda () (signal 'quit nil)))
-    (should-error (cmdr--entry-visible-p (cdr (car (cmdr--flat-entries)))) :type 'quit)))
+    (should (eq 'quit (condition-case nil
+                          (cmdr--entry-visible-p (cdr (car (cmdr--flat-entries))))
+                        (quit 'quit))))))
 
 ;;;; Transient column builder
 
@@ -457,7 +459,7 @@ LABEL may be a function called with the candidate table."
   "The suffix advice refuses an entry that became unavailable after setup."
   (let* ((state nil)
          (called nil)
-         (entry (make-cmdr-command :command 'foo :description "Foo" :category 'g
+         (entry (make-cmdr-command :command 'cmdr-test-a :description "Foo" :category 'g
                                    :transient-key "f" :inapt (lambda () state)))
          (suffix (aref (cmdr--bucket-to-column (cons 'g (list entry)) (current-buffer)) 1))
          (advice (plist-get (nthcdr 3 suffix) :advice*)))
@@ -493,8 +495,10 @@ LABEL may be a function called with the candidate table."
                            :transient-key "a" :if (lambda () t) :ifapt (lambda () nil))
     (cmdr-register-command :category 'g :command 'cmdr-test-b :description "b"
                            :transient-key "b" :exclude-from-transient t)
-    (should (seq-every-p (lambda (it) (cl-typep it 'transient-column))
-                         (cmdr--setup-row-children 1)))))
+    (let ((children (cmdr--setup-row-children 1)))
+      (should (= 1 (length children)))
+      (should (eq 'transient-column (aref (car children) 0)))
+      (should (= 1 (length (aref (car children) 2)))))))
 
 ;;;; Dispatch
 
@@ -628,7 +632,9 @@ LABEL may be a function called with the candidate table."
 (ert-deftest cmdr-test/dispatch-quit-propagates ()
   (let ((cmdr-command-table nil))
     (cmdr-register-command :category 'g :command 'cmdr-test-a :description "a")
-    (should-error (cmdr-test--dispatch-with (lambda (_) (signal 'quit nil))) :type 'quit)))
+    (should (eq 'quit (condition-case nil
+                          (cmdr-test--dispatch-with (lambda (_) (signal 'quit nil)))
+                        (quit 'quit))))))
 
 (ert-deftest cmdr-test/dispatch-predicate-error-keeps-context ()
   (let ((cmdr-command-table nil))
