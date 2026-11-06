@@ -43,7 +43,9 @@
         (seq-do (lambda (buf)
                   (when (and (buffer-file-name buf)
                              (file-in-directory-p (buffer-file-name buf) dir))
-                    (set-buffer-modified-p nil)
+                    (with-current-buffer buf
+                      (kill-local-variable 'kill-buffer-query-functions)
+                      (set-buffer-modified-p nil))
                     (kill-buffer buf)))
                 (buffer-list)))
       (delete-directory dir t))))
@@ -72,7 +74,7 @@
                   (buffer-string))))
     (seq-do (lambda (name)
               (should (string-match-p
-                       (format ";;;###autoload\n(\\(defun\\|defalias '\\)%s[ )]"
+                       (format ";;;###autoload\n(\\(defun \\|defalias '\\)%s[ )]"
                                (regexp-quote (symbol-name name)))
                        source)))
             (seq-remove (lambda (name)
@@ -94,9 +96,7 @@
 
 (ert-deftest cmdr-ops-test/load-installs-no-hooks-advice-rules-or-modes ()
   "Loading cmdr-ops in a clean process changes no policy state."
-  (let* ((root (file-name-directory
-                (directory-file-name
-                 (file-name-directory (locate-library "cmdr-ops.el")))))
+  (let* ((root (file-name-directory (locate-library "cmdr-ops.el")))
          (exe (expand-file-name invocation-name invocation-directory))
          (form
           (prin1-to-string
@@ -146,9 +146,10 @@
     (with-temp-buffer
       (let ((status (call-process exe nil t nil "--batch" "-Q" "-L" root
                                   "--eval" form)))
-        (should (eq 0 status))
-        (goto-char (point-min))
-        (should (equal '(t t t t t t t nil nil) (read (current-buffer))))))))
+        (ert-info ((buffer-string))
+          (should (eq 0 status))
+          (goto-char (point-min))
+          (should (equal '(t t t t t t t nil nil) (read (current-buffer)))))))))
 
 ;;; Window resizing
 
@@ -311,12 +312,19 @@
       (kill-buffer buf))))
 
 (ert-deftest cmdr-ops-test/kill-buffers-in-directory-prompts-for-directory ()
-  (let ((features (cons 'annotated-completing-read features))
-        (asked nil))
-    (cl-letf (((symbol-function 'annotated-completing-read-directory)
+  (let ((asked nil)
+        (required nil)
+        (original (symbol-function 'require)))
+    (cl-letf (((symbol-function 'require)
+               (lambda (feature &rest args)
+                 (if (eq feature 'annotated-completing-read)
+                     (push feature required)
+                   (apply original feature args))))
+              ((symbol-function 'annotated-completing-read-directory)
                (lambda () (setq asked t) "/nonexistent-cmdr-dir/")))
       (should-not (kill-buffers-in-directory))
-      (should asked))))
+      (should asked)
+      (should required))))
 
 (ert-deftest cmdr-ops-test/kill-eldoc-and-help-buffers ()
   (let ((help (get-buffer-create "*Help*"))
