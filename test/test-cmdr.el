@@ -662,5 +662,101 @@ LABEL may be a function called with the candidate table."
   (should-not (cmdr-transient-insert-suffix-once 'cmdr-test--undefined-prefix '(-1 0)
                                                  '("x" "extra" cmdr-test-b))))
 
+(ert-deftest cmdr-test/dispatch-all-entries-hidden-message ()
+  "A non-empty registry whose entries are all invisible says so."
+  (let ((cmdr-command-table nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a :if #'ignore)
+    (let ((err (should-error (cmdr-test--dispatch-with "cmdr-test-a") :type 'user-error)))
+      (should (string-match-p "currently visible" (cadr err))))))
+
+(ert-deftest cmdr-test/dispatch-unknown-label-reports-name ()
+  "A completion result outside the candidate table is reported, not run."
+  (let ((cmdr-command-table nil)
+        (cmdr-test--calls nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a)
+    (let ((err (should-error (cmdr-test--dispatch-with "bogus") :type 'user-error)))
+      (should (string-match-p "bogus" (cadr err))))
+    (should-not cmdr-test--calls)))
+
+(ert-deftest cmdr-test/dispatch-empty-label-invokes-nothing ()
+  "An empty or non-string completion result is treated as cancellation."
+  (let ((cmdr-command-table nil)
+        (cmdr-test--calls nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a)
+    (cmdr-test--dispatch-with "")
+    (cmdr-test--dispatch-with nil)
+    (should-not cmdr-test--calls)))
+
+(ert-deftest cmdr-test/dispatch-unavailable-never-calls-command ()
+  "A command that became unavailable after selection refuses to run."
+  (let ((cmdr-command-table nil)
+        (cmdr-test--calls nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a :ifapt (lambda () t))
+    (should-error (cmdr-test--dispatch-with "cmdr-test-a") :type 'user-error)
+    (should-not cmdr-test--calls)))
+
+(ert-deftest cmdr-test/dead-origin-falls-back-to-current-buffer ()
+  "Predicates and invocation use the current buffer when ORIGIN was killed."
+  (let* ((cmdr-command-table nil)
+         (cmdr-test--calls nil)
+         (origin (generate-new-buffer " *cmdr-dead-origin*"))
+         (seen nil)
+         (entry (cmdr-register-command :category 'g :command 'cmdr-test-a
+                                       :if (lambda () (setq seen (current-buffer))))))
+    (kill-buffer origin)
+    (with-temp-buffer
+      (should (cmdr--entry-visible-p entry origin))
+      (should (eq seen (current-buffer)))
+      (cmdr--invoke entry origin nil)
+      (should (eq (current-buffer) (nth 2 (car cmdr-test--calls)))))))
+
+(ert-deftest cmdr-test/entry-without-predicates-is-available ()
+  (let ((entry (make-cmdr-command :command 'cmdr-test-a)))
+    (should (cmdr--entry-visible-p entry))
+    (should-not (cmdr--entry-inapt-p entry))
+    (should (cmdr--entry-available-p entry))))
+
+(ert-deftest cmdr-test/menu-command-sets-up-transient-when-registered ()
+  "`cmdr-menu' hands off to Transient only after the registry check passes."
+  (let ((cmdr-command-table nil)
+        (setup nil))
+    (cl-letf (((symbol-function 'transient-setup)
+               (lambda (&rest args) (setq setup args))))
+      (should-error (call-interactively #'cmdr-menu) :type 'user-error)
+      (should-not setup)
+      (cmdr-register-command :category 'g :command 'cmdr-test-a :transient-key "a")
+      (call-interactively #'cmdr-menu)
+      (should (equal '(cmdr-menu) setup)))))
+
+(ert-deftest cmdr-test/insert-suffix-once-accepts-bare-key-string ()
+  "A bare key string already present in the layout is a no-op."
+  (let ((layout (format "%S" (get 'cmdr-test--prefix 'transient--layout))))
+    (should-not (cmdr-transient-insert-suffix-once 'cmdr-test--prefix '(-1 0) "a"))
+    (should (equal layout (format "%S" (get 'cmdr-test--prefix 'transient--layout))))))
+
+(ert-deftest cmdr-test/reset-is-explicit-only ()
+  "Registering and dispatching never reset the table."
+  (let ((cmdr-command-table nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a)
+    (cmdr-register-command :category 'g :command 'cmdr-test-a)
+    (cmdr-test--dispatch-with "cmdr-test-a")
+    (should (= 1 (length (cdr (assq 'g cmdr-command-table)))))))
+
+(ert-deftest cmdr-test/failed-registration-leaves-table-unchanged ()
+  "Every validation failure keeps the table, including a replacement attempt."
+  (let ((cmdr-command-table nil))
+    (cmdr-register-command :category 'g :command 'cmdr-test-a :transient-key "a" :description "A")
+    (let ((snapshot (copy-tree cmdr-command-table)))
+      (seq-do (lambda (args)
+                (should-error (apply #'cmdr-register-command args) :type 'user-error))
+              '((:category g :command cmdr-test-a :row 9)
+                (:category g :command cmdr-test-b :transient-key "a")
+                (:category g :command cmdr-test-b :transient-key "C-x")
+                (:category g :command cmdr-test-b :transient-key "")
+                (:category g :command cmdr-test-b :row 2)
+                (:category g :command cmdr-test-b :display-name "cmdr-test-a")
+                (:category g :command "string")))
+      (should (equal snapshot cmdr-command-table)))))
+
 (provide 'test-cmdr)
 ;;; test-cmdr.el ends here
