@@ -316,7 +316,7 @@ the pre-invocation check run in buffer ORIGIN."
        (seq-filter (lambda (column)
                      (> (length column) 1)))))))
 
-;;;###autoload
+;;;###autoload (autoload 'cmdr-menu "cmdr" nil t)
 (transient-define-prefix cmdr-menu ()
   "Categorized menu of every registered command.
 The layout is rebuilt on each invocation from `cmdr-command-table'."
