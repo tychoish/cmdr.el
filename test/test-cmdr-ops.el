@@ -630,5 +630,115 @@
     (clean-kill-ring-clean)
     (should-not kill-ring)))
 
+(defun cmdr-ops-test--capture-messages (thunk)
+  "Call THUNK and return the list of formatted messages it emitted."
+  (let ((messages nil))
+    (cl-letf (((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (when format-string
+                   (push (apply #'format format-string args) messages)))))
+      (funcall thunk))
+    (nreverse messages)))
+
+(ert-deftest cmdr-ops-test/buffer-directory-fallbacks ()
+  "A visited directory returns itself; a not-yet-existing file the default directory."
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (with-temp-buffer
+       (setq buffer-file-name (directory-file-name dir))
+       (should (equal (directory-file-name dir) (buffer-directory (current-buffer)))))
+     (with-temp-buffer
+       (setq buffer-file-name (expand-file-name "missing.txt" dir)
+             default-directory "/tmp/cmdr-default/")
+       (should (equal "/tmp/cmdr-default/" (buffer-directory (current-buffer))))))))
+
+(ert-deftest cmdr-ops-test/interactive-kill-in-directory-messages-summary ()
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (cmdr-ops-test--visit dir "m.txt")
+     (cl-letf (((symbol-function 'annotated-completing-read-directory)
+                (lambda () dir)))
+       (let ((messages (cmdr-ops-test--capture-messages
+                        (lambda () (call-interactively #'kill-buffers-in-directory)))))
+         (should (= 1 (length messages)))
+         (should (string-match-p "killed 1 buffers in subdirectory" (car messages))))))))
+
+(ert-deftest cmdr-ops-test/interactive-kill-matching-path-messages-summary ()
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (cmdr-ops-test--visit dir "zzz-unique-name.txt")
+     (cl-letf (((symbol-function 'kill-buffer-ask)
+                (lambda (buf) (kill-buffer buf)))
+               ((symbol-function 'called-interactively-p)
+                (lambda (&rest _) t)))
+       (let ((messages (cmdr-ops-test--capture-messages
+                        (lambda () (kill-buffers-matching-path "zzz-unique-name")))))
+         (should (string-match-p "killed 1 buffers matching" (car (last messages)))))))))
+
+(ert-deftest cmdr-ops-test/interactive-kill-reference-buffers-messages-summary ()
+  (require 'package)
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (let ((package-user-dir (directory-file-name dir))
+           (package-directory-list nil))
+       (cmdr-ops-test--visit dir "ref.el")
+       (let ((messages (cmdr-ops-test--capture-messages
+                        (lambda () (call-interactively #'kill-all-reference-and-source-buffers)))))
+         (should (string-match-p "killed 1 reference/source buffers" (car messages))))))))
+
+(ert-deftest cmdr-ops-test/kill-buffers-matching-mode-reads-mode-and-counts ()
+  (let ((a (generate-new-buffer " *cmdr-km-a*"))
+        (b (generate-new-buffer " *cmdr-km-b*")))
+    (seq-do (lambda (buf) (with-current-buffer buf (emacs-lisp-mode))) (list a b))
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (_prompt _collection predicate &rest _)
+                 (should (funcall predicate 'foo-mode))
+                 (should-not (funcall predicate 'foo))
+                 "emacs-lisp-mode")))
+      (let ((count nil))
+        (cmdr-ops-test--capture-messages
+         (lambda () (setq count (call-interactively #'kill-buffers-matching-mode))))
+        (should (>= count 2))
+        (should-not (buffer-live-p a))
+        (should-not (buffer-live-p b))))))
+
+(ert-deftest cmdr-ops-test/interactive-kill-missing-files-messages-summary ()
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (let ((buf (cmdr-ops-test--visit dir "gone.txt")))
+       (delete-file (buffer-file-name buf))
+       (cl-letf (((symbol-function 'kill-buffer-ask)
+                  (lambda (b) (kill-buffer b) t)))
+         (let ((messages (cmdr-ops-test--capture-messages
+                          (lambda () (call-interactively #'kill-buffers-visiting-missing-files)))))
+           (should (string-match-p "killed 1 buffers visiting missing files: " (car messages)))))
+       (cl-letf (((symbol-function 'kill-buffer-ask) #'ignore))
+         (let ((messages (cmdr-ops-test--capture-messages
+                          (lambda () (call-interactively #'kill-buffers-visiting-missing-files)))))
+           (should (equal '("killed 0 buffers visiting missing files") messages))))))))
+
+(ert-deftest cmdr-ops-test/interactive-kill-buffer-and-delete-file-messages ()
+  (cmdr-ops-test--call-with-dir
+   (lambda (dir)
+     (let* ((buf (cmdr-ops-test--visit dir "del.txt"))
+            (file (buffer-file-name buf)))
+       (with-current-buffer buf
+         (let ((messages (cmdr-ops-test--capture-messages
+                          (lambda () (call-interactively #'kill-buffer-and-delete-file)))))
+           (should (string-match-p "^Deleted " (car messages)))))
+       (should-not (file-exists-p file))))))
+
+(ert-deftest cmdr-ops-test/clean-kill-ring-clean-interactive-removes-dups ()
+  (let ((kill-ring (list "a" "a" "  " "b"))
+        (clean-kill-ring-prevent-duplicates nil))
+    (call-interactively #'clean-kill-ring-clean)
+    (should (equal '("a" "b") kill-ring))
+    (setq kill-ring (list "a" "a" "b"))
+    (clean-kill-ring-clean)
+    (should (equal '("a" "a" "b") kill-ring))
+    (let ((clean-kill-ring-prevent-duplicates t))
+      (clean-kill-ring-clean)
+      (should (equal '("a" "b") kill-ring)))))
+
 (provide 'test-cmdr-ops)
 ;;; test-cmdr-ops.el ends here
