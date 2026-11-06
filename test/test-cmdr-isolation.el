@@ -49,5 +49,13 @@ Return (EXIT-CODE . OUTPUT)."
     (should (string-match-p "\\(\"a\" \\. \"[^\"]*Apps\"\\)" (cdr result)))
     (should (string-match-p "\"f\" \\. \"find-file\"" (cdr result)))))
 
+(ert-deftest cmdr-isolation-test/generated-autoloads-load-cleanly ()
+  "Autoloads generated as a package install does must load without error."
+  (let ((result (cmdr-isolation-test--run-child 'cmdr-isolation-child-autoloads)))
+    (should (string-match-p "load: ok" (cdr result)))
+    (should-not (string-match-p "missing autoload" (cdr result)))
+    (should (string-match-p "RESULT: ok" (cdr result)))
+    (should (equal 0 (car result)))))
+
 (provide 'test-cmdr-isolation)
 ;;; test-cmdr-isolation.el ends here

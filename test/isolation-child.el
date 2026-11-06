@@ -121,5 +121,41 @@
                    (which-key--get-keymap-bindings (lookup-key map (kbd "C-c a"))))))
   (kill-emacs 0))
 
+(defun cmdr-isolation-child-autoloads ()
+  "Generate and load an autoloads file for the cmdr libraries, then exit.
+Mimics package installation: the source directory is copied elsewhere and
+removed from `load-path' while the file is generated.  Loading the result
+must neither signal nor load any cmdr library, and must leave every
+autoloaded entry point defined as an autoload."
+  (let* ((src (file-name-directory (locate-library "cmdr.el")))
+         (dir (make-temp-file "cmdr-autoloads-" t))
+         (target (expand-file-name "cmdr-autoloads.el" dir))
+         (ok t))
+    (seq-do (lambda (file) (copy-file file (file-name-as-directory dir)))
+            (directory-files src t "\\`cmdr[^/]*\\.el\\'"))
+    (setq load-path (seq-remove (lambda (path) (file-equal-p path src)) load-path))
+    (let ((inhibit-message t))
+      (loaddefs-generate dir target))
+    (condition-case err
+        (progn
+          (load target nil t t)
+          (princ "load: ok\n"))
+      (error
+       (princ (format "load: ERROR %S\n" err))
+       (setq ok nil)))
+    (seq-do (lambda (sym)
+              (unless (autoloadp (symbol-function sym))
+                (princ (format "missing autoload: %S\n" sym))
+                (setq ok nil)))
+            '(cmdr-menu cmdr-dispatch cmdr-register-command cmdr-transient-insert-suffix-once
+              cmdr-mode increase-window-up frame-opacity-reset move-text-down
+              kill-buffers-in-directory clean-kill-ring-clean save-all-buffers))
+    (when (seq-some #'featurep '(cmdr cmdr-keys cmdr-mode cmdr-macros cmdr-ops))
+      (princ "a cmdr library was loaded by its autoloads\n")
+      (setq ok nil))
+    (delete-directory dir t)
+    (princ (if ok "RESULT: ok\n" "RESULT: FAILED\n"))
+    (kill-emacs (if ok 0 1))))
+
 (provide 'isolation-child)
 ;;; isolation-child.el ends here
