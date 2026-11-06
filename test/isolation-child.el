@@ -13,6 +13,12 @@
 (require 'seq)
 (require 'subr-x)
 
+(defvar cmdr-mode-map)
+(declare-function cmdr-mode "cmdr-mode")
+(declare-function cmdr-keys-prefix "cmdr-keys")
+(declare-function cmdr-keys-set "cmdr-keys")
+(declare-function which-key--get-keymap-bindings "which-key")
+
 (defconst cmdr-isolation--maps
   '(global-map minibuffer-local-map minibuffer-local-ns-map
     minibuffer-local-completion-map minibuffer-local-must-match-map
