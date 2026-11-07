@@ -219,5 +219,25 @@
 (ert-deftest cmdr-keys-test/which-key-not-required ()
   (should-not (featurep 'which-key)))
 
+(ert-deftest cmdr-mode-test/which-key-hook-installed-and-removed ()
+  "Enabling cmdr-mode installs which-key hook; disabling removes it."
+  (let ((saved (and (boundp 'which-key-mode-hook) which-key-mode-hook)))
+    (unwind-protect
+        (progn
+          (setq which-key-mode-hook nil)
+          (cmdr-mode 1)
+          (should (memq #'cmdr-mode--setup-which-key which-key-mode-hook))
+          (cmdr-mode -1)
+          (should-not (and (boundp 'which-key-mode-hook)
+                           (memq #'cmdr-mode--setup-which-key which-key-mode-hook))))
+      (if saved
+          (setq which-key-mode-hook saved)
+        (makunbound 'which-key-mode-hook))
+      (cmdr-mode -1))))
+
+(ert-deftest cmdr-mode-test/alias-cmdr-global-minor-mode ()
+  "cmdr-global-minor-mode aliases cmdr-mode."
+  (should (eq (symbol-function 'cmdr-global-minor-mode) #'cmdr-mode)))
+
 (provide 'test-cmdr-keys)
 ;;; test-cmdr-keys.el ends here

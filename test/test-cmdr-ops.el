@@ -94,7 +94,7 @@
             djcb-opacity-modify hud--minimize-path hud-set-tab-width
             hud-run-current-major-mode-hooks hud-describe-symbol-dwim
             toggle-soft-wrap toggle-hard-wrap font-lock-show-tabs
-            font-lock-width-keyword ad:kill-new-reject-empty)))
+            font-lock-width-keyword ad:kill-new-reject-empty tychoish--set-frame-font-interactive)))
 
 (ert-deftest cmdr-ops-test/load-installs-no-hooks-advice-rules-or-modes ()
   "Loading cmdr-ops in a clean process changes no policy state."
@@ -177,22 +177,22 @@
     result))
 
 (ert-deftest cmdr-ops-test/opacity-increase-and-decrease-step ()
-  (should (= 0.525 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-increase)))
-  (should (= 0.475 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-decrease)))
-  (should (= 0.525 (cmdr-ops-test--opacity-after 50 #'frame-opacity-increase))))
+  (should (= 55 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-increase)))
+  (should (= 45 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-decrease)))
+  (should (= 55 (cmdr-ops-test--opacity-after 50 #'frame-opacity-increase))))
 
 (ert-deftest cmdr-ops-test/opacity-respects-bounds ()
   (should (eq 'unchanged (cmdr-ops-test--opacity-after nil #'frame-opacity-increase)))
-  (should (eq 'unchanged (cmdr-ops-test--opacity-after 1.0 #'frame-opacity-increase)))
-  (should (eq 'unchanged (cmdr-ops-test--opacity-after 0.2 #'frame-opacity-decrease))))
+  (should (eq 'unchanged (cmdr-ops-test--opacity-after 100 #'frame-opacity-increase)))
+  (should (eq 'unchanged (cmdr-ops-test--opacity-after 20 #'frame-opacity-decrease))))
 
 (ert-deftest cmdr-ops-test/opacity-accepts-active-inactive-pair ()
   "Regression: a (ACTIVE . INACTIVE) alpha parameter must not signal."
-  (should (= 0.525 (cmdr-ops-test--opacity-after '(50 . 40)
-                                                 #'frame-opacity-increase))))
+  (should (= 55 (cmdr-ops-test--opacity-after '(50 . 40)
+                                              #'frame-opacity-increase))))
 
 (ert-deftest cmdr-ops-test/opacity-reset ()
-  (should (= 0.95 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-reset))))
+  (should (= 95 (cmdr-ops-test--opacity-after 0.5 #'frame-opacity-reset))))
 
 (ert-deftest cmdr-ops-test/opacity-repeat-map ()
   (should (keymapp frame-opacity-repeat-map))
@@ -656,12 +656,18 @@
   (cmdr-ops-test--call-with-dir
    (lambda (dir)
      (cmdr-ops-test--visit dir "m.txt")
-     (cl-letf (((symbol-function 'annotated-completing-read-directory)
-                (lambda () dir)))
-       (let ((messages (cmdr-ops-test--capture-messages
-                        (lambda () (call-interactively #'kill-buffers-in-directory)))))
-         (should (= 1 (length messages)))
-         (should (string-match-p "killed 1 buffers in subdirectory" (car messages))))))))
+     (let ((original (symbol-function 'require)))
+       (cl-letf (((symbol-function 'require)
+                  (lambda (feature &rest args)
+                    (if (eq feature 'annotated-completing-read)
+                        t
+                      (apply original feature args))))
+                 ((symbol-function 'annotated-completing-read-directory)
+                  (lambda () dir)))
+         (let ((messages (cmdr-ops-test--capture-messages
+                          (lambda () (call-interactively #'kill-buffers-in-directory)))))
+           (should (= 1 (length messages)))
+           (should (string-match-p "killed 1 buffers in subdirectory" (car messages)))))))))
 
 (ert-deftest cmdr-ops-test/interactive-kill-matching-path-messages-summary ()
   (cmdr-ops-test--call-with-dir
@@ -739,6 +745,16 @@
     (let ((clean-kill-ring-prevent-duplicates t))
       (clean-kill-ring-clean)
       (should (equal '("a" "b") kill-ring)))))
+
+(ert-deftest cmdr-ops-test/cmdr-set-frame-font-interactive ()
+  (let ((called nil))
+    (cl-letf (((symbol-function 'annotated-completing-read-font-name)
+               (lambda (&rest _) "Source Code Pro-13")))
+      (cmdr-set-frame-font-interactive
+       (lambda (font keep-size frames inhibit-customize)
+         (setq called (list font keep-size frames inhibit-customize)))
+       "Source Code Pro-13")
+      (should (equal '("Source Code Pro-13" nil nil nil) called)))))
 
 (provide 'test-cmdr-ops)
 ;;; test-cmdr-ops.el ends here

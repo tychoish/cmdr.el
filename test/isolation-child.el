@@ -95,7 +95,7 @@
       (setq ok (and (not (memq cmdr-mode-map (current-minor-mode-maps))) ok))
       (cmdr-mode 1)
       (let ((on (cmdr-isolation--snapshot)))
-        (setq ok (and (cmdr-isolation--report "enable" (cmdr-isolation--diff loaded on '(active-maps global-minor-modes)))
+        (setq ok (and (cmdr-isolation--report "enable" (cmdr-isolation--diff loaded on '(active-maps global-minor-modes hooks)))
                       ok))
         (princ (format "enable: active map added %S\n"
                        (seq-difference (alist-get 'active-maps on) (alist-get 'active-maps loaded))))
