@@ -24,7 +24,8 @@
 ;; is never copied, so re-enabling sees any changes made while disabled.
 
 (defcustom cmdr-which-key-integration t
-  "When non-nil, configure `which-key' side-window bottom display on `which-key-mode-hook'."
+  "When non-nil, configure `which-key' side-window bottom display.
+This configuration is attached to `which-key-mode-hook'."
   :type 'boolean
   :group 'convenience)
 
@@ -36,7 +37,8 @@
 ;;;###autoload
 (define-minor-mode cmdr-mode
   "Attach `cmdr-mode-map' as a global minor-mode map.
-When enabled, also configures `which-key-mode-hook' to use side-window-bottom display."
+When enabled, also configure `which-key-mode-hook' to use
+side-window-bottom display."
   :global t
   :group 'convenience
   :keymap cmdr-mode-map
