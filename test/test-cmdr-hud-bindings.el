@@ -4,6 +4,7 @@
 (require 'ert)
 (require 'cmdr-defaults)
 (require 'cmdr-ecosystem)
+(require 'cmdr-spec)
 
 (defconst cmdr-test-hud-bindings
   '(("<mouse-2>" . clipboard-yank)
@@ -41,7 +42,7 @@
     ("C-c k w" . delete-trailing-whitespace)
     ("C-c q e" . anzu-query-replace-regexp)
     ("C-c q r" . anzu-query-replace)
-    ("C-c s e P" . eat-project-other-window)
+    ("C-c s e w" . eat-project-other-window)
     ("C-c s e e" . eat)
     ("C-c s e m" . execute-extended-eat-command)
     ("C-c s e o" . eat-other-window)
@@ -126,8 +127,7 @@
 
 (ert-deftest cmdr-test/migrated-hud-bindings ()
   (let ((cmdr-mode-map (make-sparse-keymap)))
-    (cmdr-defaults-install)
-    (cmdr-ecosystem-install)
+    (seq-do #'cmdr-spec-install (seq-map #'cmdr-spec-name cmdr-spec-table))
     (seq-do (lambda (binding)
               (should (eq (keymap-lookup cmdr-mode-map (car binding)) (cdr binding))))
             cmdr-test-hud-bindings)))

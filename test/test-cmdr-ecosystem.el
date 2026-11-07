@@ -1,8 +1,9 @@
-;;; test-cmdr-ecosystem.el --- Tests for optional ecosystem bindings -*- lexical-binding: t; -*-
+;;; test-cmdr-ecosystem.el --- Tests for the ecosystem specs -*- lexical-binding: t; -*-
 
 ;;; Code:
 (require 'ert)
 (require 'cmdr-keys)
+(require 'cmdr-ecosystem)
 
 (ert-deftest cmdr-ecosystem-test/load-does-not-install ()
   (let ((cmdr-mode-map (make-sparse-keymap)))
@@ -10,11 +11,11 @@
     (should (equal cmdr-mode-map (make-sparse-keymap)))))
 
 (ert-deftest cmdr-ecosystem-test/install-is-idempotent ()
-  (require 'cmdr-ecosystem)
-  (let ((cmdr-mode-map (make-sparse-keymap)))
-    (cmdr-ecosystem-install)
+  (let ((cmdr-mode-map (make-sparse-keymap))
+        (names '(clipboard magit smerge docker shell eat anzu dape projectile)))
+    (seq-do #'cmdr-spec-install names)
     (let ((snapshot (copy-keymap cmdr-mode-map)))
-      (cmdr-ecosystem-install)
+      (seq-do #'cmdr-spec-install names)
       (should (equal snapshot cmdr-mode-map)))
     (should (commandp (keymap-lookup cmdr-mode-map "C-c C-d")))
     (should (commandp (keymap-lookup cmdr-mode-map "C-c p")))
