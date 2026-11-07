@@ -13,7 +13,7 @@
   (require 'cmdr-ecosystem)
   (let ((cmdr-mode-map (make-sparse-keymap)))
     (cmdr-ecosystem-install)
-    (let ((snapshot (copy-tree cmdr-mode-map)))
+    (let ((snapshot (copy-keymap cmdr-mode-map)))
       (cmdr-ecosystem-install)
       (should (equal snapshot cmdr-mode-map)))
     (should (commandp (keymap-lookup cmdr-mode-map "C-c C-d")))
