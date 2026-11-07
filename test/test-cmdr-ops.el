@@ -29,7 +29,7 @@
     toggle-local-whitespace-cleanup pin-buffer-to-window-toggle
     increase-window-up increase-window-down increase-window-left
     increase-window-right frame-opacity-increase frame-opacity-decrease
-    frame-opacity-reset insert-current-date buffer-line-count buffer-directory
+    frame-opacity-reset set-up-frame-font insert-current-date buffer-line-count buffer-directory
     clean-kill-ring-clean kill-buffers-matching-name
     force-kill-buffers-matching-path kill-buffers-matching-path
     kill-all-reference-and-source-buffers kill-buffers-matching-mode
@@ -755,6 +755,32 @@
          (setq called (list font keep-size frames inhibit-customize)))
        "Source Code Pro-13")
       (should (equal '("Source Code Pro-13" nil nil nil) called)))))
+
+(ert-deftest cmdr-ops-test/set-up-frame-font-default-and-tty ()
+  (let ((default-frame-alist nil))
+    (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) nil))
+              ((symbol-function 'set-frame-font) (lambda (&rest _) (ert-fail "TTY font call"))))
+      (should (equal "Monospace-12" (set-up-frame-font "Monospace" 12)))
+      (should (equal '((font . "Monospace-12")) default-frame-alist)))))
+
+(ert-deftest cmdr-ops-test/set-up-frame-font-existing-and-gui ()
+  (let* ((cell (cons 'font "Old-10"))
+         (default-frame-alist (list cell))
+         calls)
+    (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t))
+              ((symbol-function 'set-frame-font) (lambda (&rest args) (setq calls args))))
+      (should (equal "New-14" (set-up-frame-font "New" 14)))
+      (should (equal '("New-14" nil t) calls))
+      (should (eq cell (car default-frame-alist)))
+      (should (equal '((font . "New-14")) default-frame-alist)))))
+
+(ert-deftest cmdr-ops-test/set-up-frame-font-interactive ()
+  (let ((default-frame-alist nil))
+    (cl-letf (((symbol-function 'annotated-completing-read-font-name) (lambda (&rest _) "Chosen"))
+              ((symbol-function 'read-number) (lambda (&rest _) 15))
+              ((symbol-function 'display-graphic-p) (lambda (&rest _) nil)))
+      (call-interactively #'set-up-frame-font)
+      (should (equal "Chosen-15" (alist-get 'font default-frame-alist))))))
 
 (provide 'test-cmdr-ops)
 ;;; test-cmdr-ops.el ends here

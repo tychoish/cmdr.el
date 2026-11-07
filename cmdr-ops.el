@@ -493,6 +493,23 @@ Advice wrapper for `set-frame-font'."
   (funcall orig-fn font keep-size frames inhibit-customize))
 
 ;;;###autoload
+(defun set-up-frame-font (font-face-name size)
+  "Set font to FONT-FACE-NAME and SIZE using `set-frame-font'."
+  (interactive
+   (list (if (fboundp 'annotated-completing-read-font-name)
+             (annotated-completing-read-font-name)
+           (read-string "Font name: "))
+         (read-number "Size: " 13)))
+  (let ((font (format "%s-%s" font-face-name size))
+        (cell (assoc 'font default-frame-alist)))
+    (if cell
+        (setcdr cell font)
+      (add-to-list 'default-frame-alist (cons 'font font)))
+    (when (display-graphic-p)
+      (set-frame-font font nil t))
+    (alist-get 'font default-frame-alist)))
+
+;;;###autoload
 (defun ensure-frame-font (font-face-name size)
   "Ensure default frame font is set, applying FONT-FACE-NAME and SIZE if unset."
   (unless (alist-get 'font default-frame-alist)
