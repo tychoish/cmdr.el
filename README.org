@@ -11,7 +11,7 @@ the key, macro and operation helpers that go with it.
 :CUSTOM_ID: overview
 :END:
 
-One repository, five independent libraries. Load only what you need;
+One repository with independent libraries and opt-in plugins. Load only what you need;
 loading a library never installs hooks, advice or modes (the one
 exception, =cmdr-mode=, is a plain minor mode you turn on yourself).
 
@@ -22,6 +22,8 @@ exception, =cmdr-mode=, is a plain minor mode you turn on yourself).
 | =cmdr-macros=  | Toggle, command-generator, hook and deferred-keymap macros    | built-ins only                          |
 | =cmdr-ops=     | Autoloaded interactive operations (windows, buffers, text)    | =annotated-completing-read= (at call time) |
 | =cmdr-mode=    | Global minor mode attaching =cmdr-mode-map=                   | =cmdr-keys=                             |
+| =cmdr-defaults= | Optional general editing and navigation bindings            | =cmdr-keys=                             |
+| =cmdr-ecosystem= | Optional common package bindings                           | =cmdr-keys=, =cmdr-macros=              |
 
 None of them depends on =xtd-macro= (xtdlib), hud-mode or any personal
 configuration.
@@ -61,6 +63,22 @@ git clone https://github.com/tychoish/cmdr.el.git ~/.emacs.d/site-lisp/cmdr.el
 #+end_src
 
 Dependencies: =transient= and =annotated-completing-read=.
+
+* Optional default bindings
+
+The defaults plugin supplies general editing, display, help, buffer and
+navigation bindings.  Loading it installs nothing; opt in explicitly:
+
+#+begin_src emacs-lisp
+(require 'cmdr-defaults)
+(cmdr-defaults-install)
+(cmdr-mode 1)
+#+end_src
+
+Installation is idempotent and configures the cmdr map without enabling it.
+For common package bindings, also load =cmdr-ecosystem= and call
+=cmdr-ecosystem-install=.  The two plugins can be installed independently
+or together.
 
 * Registry
 :PROPERTIES:

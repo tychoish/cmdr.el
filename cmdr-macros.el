@@ -171,10 +171,9 @@ Only commands whose names begin with PREFIX are offered for completion.
 Optionally bind the command to BIND-KEY in BIND-MAP (default `global-map')
 labeled KEY-ALIAS."
   (declare (indent defun))
-  (unless (setq prefix (when-let* ((_ prefix)
-                                   (trimmed (string-trim prefix))
-                                   (_ (not (string-empty-p trimmed))))
-                         trimmed))
+  (unless (setq prefix (and prefix
+                            (let ((trimmed (string-trim prefix)))
+                              (unless (string-empty-p trimmed) trimmed))))
     (user-error "Cannot build predicate function for an empty prefix"))
 
   (let* ((predicate-symbol (intern (format "read-extended-command-for-%s-prefix-p" prefix)))

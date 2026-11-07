@@ -3,7 +3,7 @@
 ;; Author: sam kleinman <sam@tychoish.com>
 ;; Maintainer: sam kleinman <sam@tychoish.com>
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "29.4") (transient "0.7") (annotated-completing-read "0.1"))
+;; Package-Requires: ((emacs "29.4") (transient "0.9.3") (annotated-completing-read "0.1"))
 ;; Keywords: convenience, tools
 ;; URL: https://github.com/tychoish/cmdr.el
 

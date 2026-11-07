@@ -24,6 +24,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Emacs 30 bundles an older Transient; install an archive version that
+      # satisfies cmdr's declared minimum before the shared actions initialize.
+      - name: Install compatible Transient
+        run: |
+          emacs --batch --eval "(progn
+            (require 'package)
+            (setq package-archives '((\"gnu\" . \"https://elpa.gnu.org/packages/\")
+                                     (\"nongnu\" . \"https://elpa.nongnu.org/nongnu/\")))
+            (package-initialize)
+            (unless (package-installed-p 'transient '(0 9 3))
+              (package-refresh-contents)
+              (package-install (cadr (assq 'transient package-archive-contents)))))"
+
       # package-lint and relint are advisory: cmdr-ops and cmdr-macros
       # intentionally export unprefixed command and macro names.
       - name: Lint Source Code
