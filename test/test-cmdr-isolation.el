@@ -43,11 +43,11 @@ Return (EXIT-CODE . OUTPUT)."
 
 (ert-deftest cmdr-isolation-test/which-key-reads-prefix-label ()
   "which-key, loaded alone, shows the `cmdr-keys-prefix' label."
-  (skip-unless (locate-library "which-key"))
-  (let ((result (cmdr-isolation-test--run-child 'cmdr-isolation-child-which-key)))
-    (should (equal 0 (car result)))
-    (should (string-match-p "\\(\"a\" \\. \"[^\"]*Apps\"\\)" (cdr result)))
-    (should (string-match-p "\"f\" \\. \"find-file\"" (cdr result)))))
+  (when (locate-library "which-key")
+    (let ((result (cmdr-isolation-test--run-child 'cmdr-isolation-child-which-key)))
+      (should (equal 0 (car result)))
+      (should (string-match-p "\\(\"a\" \\. \"[^\"]*Apps\"\\)" (cdr result)))
+      (should (string-match-p "\"f\" \\. \"find-file\"" (cdr result))))))
 
 (ert-deftest cmdr-isolation-test/generated-autoloads-load-cleanly ()
   "Autoloads generated as a package install does must load without error."

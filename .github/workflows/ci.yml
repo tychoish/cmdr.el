@@ -27,7 +27,7 @@ jobs:
       # Emacs 30 bundles an older Transient; install an archive version that
       # satisfies cmdr's declared minimum before the shared actions initialize.
       - name: Install compatible Transient
-        run: |
+        run: |\
           emacs --batch --eval "(progn
             (require 'package)
             (setq package-archives '((\"gnu\" . \"https://elpa.gnu.org/packages/\")
@@ -49,12 +49,12 @@ jobs:
       - name: Run ERT Tests
         uses: tychoish/elisp-ci@main
         with:
-          dependencies: "transient annotated-completing-read"
+          dependencies: "transient annotated-completing-read which-key"
 
       - name: Measure Code Coverage
         uses: tychoish/elisp-ci/coverage@main
         with:
-          dependencies: "transient annotated-completing-read"
+          dependencies: "transient annotated-completing-read which-key"
           report-format: "lcov"
           output-file: "coverage/lcov.info"
 
