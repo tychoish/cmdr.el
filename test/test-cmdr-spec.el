@@ -132,6 +132,15 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c r s n") #'agent-shell-new-shell))
     (should (eq (keymap-lookup cmdr-mode-map "C-c m m") #'mu4e))))
 
+(ert-deftest cmdr-spec-test/elpaish-spec-registers-upgrade-command ()
+  (let ((spec (cmdr-spec-get 'elpaish)))
+    (should spec)
+    (should (eq (cmdr-spec-probe spec) 'elpaish-install-upgrade-packages))
+    (let ((cmd (car (cmdr-spec-commands spec))))
+      (should (eq (cmdr-spec-command-command cmd) 'elpaish-install-upgrade-packages))
+      (should (eq (cmdr-spec-command-category cmd) 'elpaish))
+      (should (cmdr-spec-command-exclude-from-transient cmd)))))
+
 (ert-deftest cmdr-spec-test/bindings-have-no-capital-letters ()
   (seq-do (lambda (spec)
             (seq-do (pcase-lambda (`(,key . ,_))
