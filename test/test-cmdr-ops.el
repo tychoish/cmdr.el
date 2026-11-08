@@ -33,7 +33,9 @@
     clean-kill-ring-clean kill-buffers-matching-name
     force-kill-buffers-matching-path kill-buffers-matching-path
     kill-all-reference-and-source-buffers kill-buffers-matching-mode
-    kill-buffers-visiting-missing-files kill-buffer-and-delete-file)
+    kill-buffers-visiting-missing-files kill-buffer-and-delete-file
+    smerge-kill-and-vc-next-conflict markdown-align-tables
+    markdown-align-tables-in-file markdown-align-tables-dired)
   "Public entry points that must carry an autoload cookie.")
 
 (defun cmdr-ops-test--call-with-dir (fn)

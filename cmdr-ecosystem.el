@@ -42,6 +42,7 @@
   :prefixes (("C-x g m" . "smerge"))
   :bindings (("C-x g m n" . smerge-vc-next-conflict)
              ("C-x g m k" . smerge-kill-current)
+             ("C-x g m r" . smerge-kill-and-vc-next-conflict)
              ("C-x g m s" . smerge-start-session)
              ("C-x g m t" . smerge-keep-current)
              ("C-x g m x" . execute-extended-smerge-command)))

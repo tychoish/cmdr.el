@@ -562,5 +562,55 @@ FRAME defaults to the selected frame."
   (interactive)
   (set-frame-parameter frame 'menu-bar-lines (if (display-graphic-p frame) 1 0)))
 
+(declare-function dired-get-marked-files "dired")
+(declare-function markdown-table-end "markdown-mode")
+(declare-function markdown-table-align "markdown-mode")
+(declare-function smerge-vc-next-conflict "smerge-mode")
+(declare-function smerge-kill-current "smerge-mode")
+
+;;;###autoload
+(defun smerge-kill-and-vc-next-conflict ()
+  "Kill the current conflict option and move to the next conflict."
+  (interactive)
+  (require 'smerge-mode)
+  (smerge-kill-current)
+  (smerge-vc-next-conflict))
+
+;;;###autoload
+(defun markdown-align-tables ()
+  "Align all tables in the current buffer."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (let ((count 0))
+      (while (re-search-forward "^|" nil t)
+        (when (and (fboundp 'markdown-table-at-point-p)
+                   (markdown-table-at-point-p))
+          (markdown-table-align)
+          (setq count (1+ count))
+          (goto-char (markdown-table-end))))
+      (message "Aligned %d table(s)" count))))
+
+;;;###autoload
+(defun markdown-align-tables-in-file (file)
+  "Align all markdown tables in FILE."
+  (interactive "fMarkdown file: ")
+  (with-current-buffer (find-file-noselect file)
+    (markdown-align-tables)
+    (save-buffer)))
+
+;;;###autoload
+(defun markdown-align-tables-dired ()
+  "Align tables in all marked files in the current dired buffer."
+  (interactive)
+  (seq-do #'markdown-align-tables-in-file (dired-get-marked-files)))
+
+;;;###autoload
+(defalias 'tychoish/markdown-align-tables #'markdown-align-tables)
+;;;###autoload
+(defalias 'tychoish/markdown-align-tables-in-file #'markdown-align-tables-in-file)
+;;;###autoload
+(defalias 'tychoish/markdown-align-tables-dired #'markdown-align-tables-dired)
+
 (provide 'cmdr-ops)
 ;;; cmdr-ops.el ends here
