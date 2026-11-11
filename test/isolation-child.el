@@ -95,7 +95,11 @@
       (setq ok (and (not (memq cmdr-mode-map (current-minor-mode-maps))) ok))
       (cmdr-mode 1)
       (let ((on (cmdr-isolation--snapshot)))
-        (setq ok (and (cmdr-isolation--report "enable" (cmdr-isolation--diff loaded on '(active-maps global-minor-modes hooks)))
+        (setq ok (and (cmdr-isolation--report "enable" (cmdr-isolation--diff loaded on '(active-maps global-minor-modes hooks advice)))
+                      ok))
+        (setq ok (and (equal (seq-difference (alist-get 'advice on) (alist-get 'advice loaded))
+                             '(set-frame-font))
+                      (null (seq-difference (alist-get 'advice loaded) (alist-get 'advice on)))
                       ok))
         (princ (format "enable: active map added %S\n"
                        (seq-difference (alist-get 'active-maps on) (alist-get 'active-maps loaded))))

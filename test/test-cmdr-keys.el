@@ -184,6 +184,42 @@
   (should (keymapp cmdr-mode-map))
   (should (stringp (documentation-property 'cmdr-mode-map 'variable-documentation))))
 
+(ert-deftest cmdr-mode-test/font-advice-follows-mode ()
+  "Enabling and disabling the mode installs and removes the font advice."
+  (let ((was-enabled (bound-and-true-p cmdr-mode)))
+    (unwind-protect
+        (progn
+          (cmdr-mode -1)
+          (should-not (advice-member-p #'cmdr-set-frame-font-interactive 'set-frame-font))
+          (cmdr-mode 1)
+          (should (advice-member-p #'cmdr-set-frame-font-interactive 'set-frame-font))
+          (cmdr-mode 1)
+          (cmdr-mode -1)
+          (should-not (advice-member-p #'cmdr-set-frame-font-interactive 'set-frame-font)))
+      (cmdr-mode (if was-enabled 1 -1)))))
+
+(ert-deftest cmdr-mode-test/font-advice-interactive-prompt ()
+  "The advised command passes the chosen font to the underlying function."
+  (let ((was-enabled (bound-and-true-p cmdr-mode))
+        (original-font (symbol-function 'set-frame-font))
+        (original-picker (and (fboundp 'annotated-completing-read-font-name)
+                              (symbol-function 'annotated-completing-read-font-name)))
+        selected)
+    (unwind-protect
+        (progn
+          (cmdr-mode -1)
+          (fset 'set-frame-font (lambda (font &rest _) (interactive "sFont: ") (setq selected font)))
+          (fset 'annotated-completing-read-font-name (lambda (&rest _) "Test Font"))
+          (cmdr-mode 1)
+          (call-interactively #'set-frame-font)
+          (should (equal selected "Test Font")))
+      (cmdr-mode -1)
+      (fset 'set-frame-font original-font)
+      (if original-picker
+          (fset 'annotated-completing-read-font-name original-picker)
+        (fmakunbound 'annotated-completing-read-font-name))
+      (cmdr-mode (if was-enabled 1 -1)))))
+
 (ert-deftest cmdr-mode-test/enable-disable-reveals-prior-binding ()
   (cmdr-test-keys--with-global '(("C-c y" . ignore))
     (cmdr-test-keys--with-clean-root

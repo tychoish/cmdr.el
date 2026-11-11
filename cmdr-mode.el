@@ -15,6 +15,8 @@
 
 (require 'cmdr-keys)
 
+(autoload 'cmdr-set-frame-font-interactive "cmdr-ops" nil t)
+
 (defvar which-key-mode-hook)
 
 ;; Design: a standard `define-minor-mode' with :keymap.  This registers
@@ -38,15 +40,18 @@ This configuration is attached to `which-key-mode-hook'."
 (define-minor-mode cmdr-mode
   "Attach `cmdr-mode-map' as a global minor-mode map.
 When enabled, also configure `which-key-mode-hook' to use
-side-window-bottom display."
+side-window-bottom display and use the cmdr interactive font prompt."
   :global t
   :group 'convenience
   :keymap cmdr-mode-map
   (if cmdr-mode
-      (when cmdr-which-key-integration
-        (add-hook 'which-key-mode-hook #'cmdr-mode--setup-which-key)
-        (when (bound-and-true-p which-key-mode)
-          (cmdr-mode--setup-which-key)))
+      (progn
+        (advice-add 'set-frame-font :around #'cmdr-set-frame-font-interactive)
+        (when cmdr-which-key-integration
+          (add-hook 'which-key-mode-hook #'cmdr-mode--setup-which-key)
+          (when (bound-and-true-p which-key-mode)
+            (cmdr-mode--setup-which-key))))
+    (advice-remove 'set-frame-font #'cmdr-set-frame-font-interactive)
     (remove-hook 'which-key-mode-hook #'cmdr-mode--setup-which-key)
     (when (and (boundp 'which-key-mode-hook)
                (null which-key-mode-hook)
