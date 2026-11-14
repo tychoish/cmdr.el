@@ -20,6 +20,7 @@
 (require 'cmdr-macros)
 
 
+(make-read-extended-command-for-prefix "denote")
 (make-read-extended-command-for-prefix "elpaish")
 (make-read-extended-command-for-prefix "agent-shell")
 (make-read-extended-command-for-prefix "gptel")
@@ -31,7 +32,9 @@
 
 (cmdr-register-spec
   :name denote
-  :probe denote
+  :probe denote-dash
+  :keymap-bindings ((denote-dash denote-dash-global-map
+                     ("x" . (cons "denote-commands" 'execute-extended-denote-command))))
   :commands ((cmdr-spec-command :category denote
                                 :command denote-dash
                                 :description "denote list"

@@ -180,5 +180,38 @@
             (should (cmdr-spec-test--bound-p "C-c z u")))
         (delete-directory dir t)))))
 
+(defvar test-cmdr-spec--ext-map (make-sparse-keymap))
+(defvar test-cmdr-spec--sub-map nil)
+
+(ert-deftest cmdr-spec-test/keymap-bindings-install ()
+  (cmdr-spec-test--with-table
+    (provide 'test-cmdr-spec-feature)
+    (cmdr-register-spec
+      :name ext-feature
+      :probe "ert"
+      :keymap-bindings
+      ((test-cmdr-spec-feature test-cmdr-spec--ext-map
+        :prefixes (("/" "test-sub" test-cmdr-spec--sub-map))
+        :bindings (("/ x" . (cons "test-cmd" 'ignore))
+                   ("/ y" . 'ignore)))))
+    (cmdr-spec-install 'ext-feature)
+    (should test-cmdr-spec--sub-map)
+    (should (eq (keymap-lookup test-cmdr-spec--ext-map "/") test-cmdr-spec--sub-map))
+    (should (eq (keymap-lookup test-cmdr-spec--sub-map "x") 'ignore))
+    (should (eq (keymap-lookup test-cmdr-spec--sub-map "y") 'ignore))))
+
+(ert-deftest cmdr-spec-test/keymap-bindings-shorthand ()
+  (cmdr-spec-test--with-table
+    (provide 'test-cmdr-spec-feature2)
+    (defvar test-cmdr-spec--shorthand-map (make-sparse-keymap))
+    (cmdr-register-spec
+      :name ext-feature2
+      :probe "ert"
+      :keymap-bindings
+      ((test-cmdr-spec-feature2 test-cmdr-spec--shorthand-map
+        ("a" . 'ignore))))
+    (cmdr-spec-install 'ext-feature2)
+    (should (eq (keymap-lookup test-cmdr-spec--shorthand-map "a") 'ignore))))
+
 (provide 'test-cmdr-spec)
 ;;; test-cmdr-spec.el ends here

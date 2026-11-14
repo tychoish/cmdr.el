@@ -26,6 +26,9 @@
   :name clipboard
   :bindings (("C-x x c" . execute-extended-clipboard-command)))
 
+(defvar magit-command-mode-map nil
+  "Keymap for Magit extended commands beneath `/'.")
+
 (cmdr-register-spec
   :name magit
   :probe magit-status
@@ -34,7 +37,11 @@
              ("C-x g f" . magit-branch)
              ("C-x g b" . magit-blame)
              ("C-x g l" . git-link)
-             ("C-x g x" . execute-extended-magit-command)))
+             ("C-x g x" . execute-extended-magit-command))
+  :keymap-bindings ((magit magit-mode-map
+                     :prefixes (("/" "magit-command" magit-command-mode-map))
+                     :bindings (("/ x" . (cons "magit-commands" 'execute-extended-magit-command))
+                                ("/ m" . (cons "(s)merge-commands" 'execute-extended-smerge-command))))))
 
 (cmdr-register-spec
   :name smerge

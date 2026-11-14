@@ -51,7 +51,7 @@ These contain only `cmdr-register-spec' forms and require nothing else."
 
 (cl-defstruct (cmdr-spec (:copier nil))
   "One feature's prefixes, bindings and registry commands."
-  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands)
+  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings)
 
 (cl-defstruct (cmdr-spec-command (:copier nil))
   "A registry command carried by a spec until `cmdr' loads.
@@ -80,7 +80,7 @@ function symbols or lambda forms."
                            :inapt ,(when ifapt `(function ,ifapt))
                            :exclude-from-transient ',exclude-from-transient))
 
-(cl-defmacro cmdr-register-spec (&key name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands)
+(cl-defmacro cmdr-register-spec (&key name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings)
   "Register or replace the spec NAME, a required symbol.
 Every argument is quoted data.
 PROBE is a function symbol (must be `fboundp') or library name string
@@ -90,7 +90,9 @@ AUTOLOADS is a library name or list of names that installing loads when
 OPT-IN non-nil installs only when NAME is in `cmdr-opt-in-specs'.
 PREFIXES is a list of (KEY . LABEL), BINDINGS a list of (KEY . COMMAND),
 DEFERRED-KEYMAPS a list of (KEY PACKAGE KEYMAP-SYMBOL LABEL).  COMMANDS is a
-list of `cmdr-spec-command' forms and is the one argument that is evaluated."
+list of `cmdr-spec-command' forms and is the one argument that is evaluated.
+KEYMAP-BINDINGS is a list of (PACKAGE KEYMAP-SYMBOL . SPEC) defining bindings
+in external keymaps when PACKAGE loads."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
@@ -99,7 +101,8 @@ list of `cmdr-spec-command' forms and is the one argument that is evaluated."
                                    :opt-in ',opt-in :prefixes ',prefixes
                                    :bindings ',bindings
                                    :deferred-keymaps ',deferred-keymaps
-                                   :commands (list ,@commands))))
+                                   :commands (list ,@commands)
+                                   :keymap-bindings ',keymap-bindings)))
 
 (defun cmdr-spec--put (spec)
   "Add SPEC to `cmdr-spec-table', replacing a same-named spec in place."
@@ -112,6 +115,19 @@ list of `cmdr-spec-command' forms and is the one argument that is evaluated."
                      cmdr-spec-table)
           (append cmdr-spec-table (list spec))))
   spec)
+
+(defun cmdr-spec--normalize-command (cmd)
+  "Normalize CMD for `cmdr-keys-set'."
+  (cond
+   ((and (consp cmd) (eq (car cmd) 'quote))
+    (cadr cmd))
+   ((and (consp cmd) (eq (car cmd) 'cons))
+    (eval cmd t))
+   ((and (consp cmd) (consp (cdr cmd)) (null (cddr cmd)) (stringp (car cmd)))
+    (cons (car cmd) (if (and (consp (cadr cmd)) (eq (car (cadr cmd)) 'quote))
+                        (cadr (cadr cmd))
+                      (cadr cmd))))
+   (t cmd)))
 
 (defun cmdr-spec-get (name)
   "Return the spec called NAME or signal `user-error'."
@@ -190,6 +206,29 @@ Installing again is idempotent."
               (unless (keymap-lookup cmdr-mode-map key)
                 (cmdr-bind-deferred-keymap cmdr-mode-map key package keymap-symbol label)))
             (cmdr-spec-deferred-keymaps spec))
+    (seq-do (pcase-lambda (`(,package ,keymap-symbol . ,rest))
+              (let* ((prefixes (if (keywordp (car-safe rest))
+                                   (plist-get rest :prefixes)
+                                 nil))
+                     (bindings (if (keywordp (car-safe rest))
+                                   (plist-get rest :bindings)
+                                 rest)))
+                (with-eval-after-load package
+                  (let ((map (if (symbolp keymap-symbol)
+                                 (and (boundp keymap-symbol) (symbol-value keymap-symbol))
+                               keymap-symbol)))
+                    (when (keymapp map)
+                      (seq-do (pcase-lambda (`(,key . ,rest-prefix))
+                                (let ((label (if (consp rest-prefix) (car rest-prefix) rest-prefix))
+                                      (var (when (consp rest-prefix) (cadr rest-prefix))))
+                                  (let ((child (cmdr-keys-prefix map key label)))
+                                    (when var
+                                      (set var child)))))
+                              prefixes)
+                      (seq-do (pcase-lambda (`(,key . ,command))
+                                (cmdr-keys-set map key (cmdr-spec--normalize-command command)))
+                              bindings))))))
+            (ignore-errors (cmdr-spec-keymap-bindings spec)))
     (when (cmdr-spec-commands spec)
       (setq cmdr-spec--pending (cons spec (delq spec cmdr-spec--pending)))
       (when (featurep 'cmdr)

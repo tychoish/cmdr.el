@@ -30,5 +30,17 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c M-'") #'popper-kill-latest-popup))
     (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))))
 
+(defvar magit-mode-map nil)
+
+(ert-deftest cmdr-ecosystem-test/magit-keymap-bindings ()
+  (let ((magit-mode-map (make-sparse-keymap)))
+    (setq magit-command-mode-map nil)
+    (provide 'magit)
+    (cmdr-spec-install 'magit)
+    (should magit-command-mode-map)
+    (should (eq (keymap-lookup magit-mode-map "/") magit-command-mode-map))
+    (should (eq (keymap-lookup magit-command-mode-map "x") 'execute-extended-magit-command))
+    (should (eq (keymap-lookup magit-command-mode-map "m") 'execute-extended-smerge-command))))
+
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
