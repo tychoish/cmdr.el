@@ -34,13 +34,15 @@
 (defmacro cmdr-test-keys--with-clean-root (&rest body)
   "Run BODY with an empty `cmdr-mode-map', disabled, restoring afterwards."
   (declare (indent 0))
-  `(unwind-protect
-       (progn
-         (cmdr-mode -1)
-         (setcdr cmdr-mode-map nil)
-         ,@body)
-     (cmdr-mode -1)
-     (setcdr cmdr-mode-map nil)))
+  `(let ((was-on (bound-and-true-p cmdr-mode))
+         (orig-map (copy-keymap cmdr-mode-map)))
+     (unwind-protect
+         (progn
+           (cmdr-mode -1)
+           (setcdr cmdr-mode-map nil)
+           ,@body)
+       (setcdr cmdr-mode-map (cdr orig-map))
+       (cmdr-mode (if was-on 1 -1)))))
 
 (defmacro cmdr-test-keys--with-global (bindings &rest body)
   "Run BODY with a throwaway current global map holding BINDINGS."
@@ -221,43 +223,53 @@
       (cmdr-mode (if was-enabled 1 -1)))))
 
 (ert-deftest cmdr-mode-test/enable-disable-reveals-prior-binding ()
-  (cmdr-test-keys--with-global '(("C-c y" . ignore))
-    (cmdr-test-keys--with-clean-root
-      (cmdr-keys-set cmdr-mode-map "C-c y" #'next-line)
-      (should (eq #'ignore (key-binding (kbd "C-c y"))))
-      (cmdr-mode 1)
-      (should (eq #'next-line (key-binding (kbd "C-c y"))))
-      (cmdr-mode -1)
-      (should (eq #'ignore (key-binding (kbd "C-c y")))))))
+  (let ((was-on (bound-and-true-p cmdr-mode)))
+    (unwind-protect
+        (cmdr-test-keys--with-global '(("C-c y" . ignore))
+          (cmdr-test-keys--with-clean-root
+            (cmdr-keys-set cmdr-mode-map "C-c y" #'next-line)
+            (should (eq #'ignore (key-binding (kbd "C-c y"))))
+            (cmdr-mode 1)
+            (should (eq #'next-line (key-binding (kbd "C-c y"))))
+            (cmdr-mode -1)
+            (should (eq #'ignore (key-binding (kbd "C-c y"))))))
+      (cmdr-mode (if was-on 1 -1)))))
 
 (ert-deftest cmdr-mode-test/configure-while-disabled-and-reenable ()
-  (cmdr-test-keys--with-global nil
-    (cmdr-test-keys--with-clean-root
-      (cmdr-keys-set cmdr-mode-map "C-c y" #'next-line)
-      (should-not (key-binding (kbd "C-c y")))
-      (cmdr-mode 1)
-      (cmdr-mode -1)
-      (cmdr-keys-set cmdr-mode-map "C-c z" #'previous-line)
-      (should-not (key-binding (kbd "C-c z")))
-      (cmdr-mode 1)
-      (should (eq #'previous-line (key-binding (kbd "C-c z")))))))
+  (let ((was-on (bound-and-true-p cmdr-mode)))
+    (unwind-protect
+        (cmdr-test-keys--with-global nil
+          (cmdr-test-keys--with-clean-root
+            (cmdr-keys-set cmdr-mode-map "C-c y" #'next-line)
+            (should-not (key-binding (kbd "C-c y")))
+            (cmdr-mode 1)
+            (cmdr-mode -1)
+            (cmdr-keys-set cmdr-mode-map "C-c z" #'previous-line)
+            (should-not (key-binding (kbd "C-c z")))
+            (cmdr-mode 1)
+            (should (eq #'previous-line (key-binding (kbd "C-c z"))))))
+      (cmdr-mode (if was-on 1 -1)))))
 
 (ert-deftest cmdr-mode-test/global-map-unchanged ()
   (should cmdr-test-keys--load-left-global-map-intact)
-  (let ((before (copy-tree global-map)))
-    (cmdr-test-keys--with-clean-root
-      (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
-      (cmdr-keys-set cmdr-mode-map "C-c a f" #'ignore)
-      (cmdr-mode 1)
-      (cmdr-mode -1)
-      (should (equal before global-map)))))
+  (let ((before (copy-tree global-map))
+        (was-on (bound-and-true-p cmdr-mode)))
+    (unwind-protect
+        (cmdr-test-keys--with-clean-root
+          (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
+          (cmdr-keys-set cmdr-mode-map "C-c a f" #'ignore)
+          (cmdr-mode 1)
+          (cmdr-mode -1)
+          (should (equal before global-map)))
+      (cmdr-mode (if was-on 1 -1)))))
 
 (ert-deftest cmdr-keys-test/which-key-not-required ()
   (should-not (featurep 'which-key)))
 
 (ert-deftest cmdr-mode-test/which-key-hook-installed-and-removed ()
   "Enabling cmdr-mode installs which-key hook; disabling removes it."
-  (let ((saved (and (boundp 'which-key-mode-hook) which-key-mode-hook)))
+  (let ((saved (and (boundp 'which-key-mode-hook) which-key-mode-hook))
+        (was-on (bound-and-true-p cmdr-mode)))
     (unwind-protect
         (progn
           (setq which-key-mode-hook nil)
@@ -269,7 +281,7 @@
       (if saved
           (setq which-key-mode-hook saved)
         (makunbound 'which-key-mode-hook))
-      (cmdr-mode -1))))
+      (cmdr-mode (if was-on 1 -1)))))
 
 (ert-deftest cmdr-mode-test/alias-cmdr-global-minor-mode ()
   "cmdr-global-minor-mode aliases cmdr-mode."
