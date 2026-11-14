@@ -60,17 +60,20 @@
       (should (equal "unspecified-fg" fg)))))
 
 (ert-deftest cmdr-frame-test/cmdr-frame-mode-hooks ()
-  (unwind-protect
-      (progn
-        (cmdr-frame-mode 1)
-        (should (memq #'cmdr-frame--setup-frame after-make-frame-functions))
-        (should (memq #'cmdr-frame--reapply-after-theme enable-theme-functions))
-        (should (member cmdr-frame-readonly-display-buffer-entry display-buffer-alist))
-        (cmdr-frame-mode -1)
-        (should-not (memq #'cmdr-frame--setup-frame after-make-frame-functions))
-        (should-not (memq #'cmdr-frame--reapply-after-theme enable-theme-functions))
-        (should-not (member cmdr-frame-readonly-display-buffer-entry display-buffer-alist)))
-    (cmdr-frame-mode -1)))
+  (let ((was-on (bound-and-true-p cmdr-frame-mode)))
+    (unwind-protect
+        (progn
+          (cmdr-frame-mode 1)
+          (should (memq #'cmdr-frame--setup-frame after-make-frame-functions))
+          (should (memq #'cmdr-frame--reapply-after-theme enable-theme-functions))
+          (should (member cmdr-frame-readonly-display-buffer-entry display-buffer-alist))
+          (cmdr-frame-mode -1)
+          (should-not (memq #'cmdr-frame--setup-frame after-make-frame-functions))
+          (should-not (memq #'cmdr-frame--reapply-after-theme enable-theme-functions))
+          (should-not (member cmdr-frame-readonly-display-buffer-entry display-buffer-alist)))
+      (if was-on
+          (cmdr-frame-mode 1)
+        (cmdr-frame-mode -1)))))
 
 (ert-deftest cmdr-frame-test/buffer-home-frame ()
   (let ((cmdr-frame--buffer-home-frame nil)

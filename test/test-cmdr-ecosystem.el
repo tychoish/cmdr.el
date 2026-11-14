@@ -12,7 +12,7 @@
 
 (ert-deftest cmdr-ecosystem-test/install-is-idempotent ()
   (let ((cmdr-mode-map (make-sparse-keymap))
-        (names '(clipboard magit smerge docker shell eat anzu dape projectile)))
+        (names '(clipboard magit smerge docker shell eat anzu dape projectile popper)))
     (seq-do #'cmdr-spec-install names)
     (let ((snapshot (copy-keymap cmdr-mode-map)))
       (seq-do #'cmdr-spec-install names)
@@ -23,7 +23,12 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-x g s") #'magit-status))
     (should (eq (keymap-lookup cmdr-mode-map "C-x d c") #'docker-containers))
     (should (eq (keymap-lookup cmdr-mode-map "C-c s e e") #'eat))
-    (should (eq (keymap-lookup cmdr-mode-map "C-c q r") #'anzu-query-replace))))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c q r") #'anzu-query-replace))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c '") #'popper-toggle))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c C-'") #'popper-toggle))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c \\") #'popper-cycle))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c M-'") #'popper-kill-latest-popup))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))))
 
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
