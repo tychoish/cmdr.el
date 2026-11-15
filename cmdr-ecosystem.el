@@ -29,6 +29,14 @@
 (defvar magit-command-mode-map nil
   "Keymap for Magit extended commands beneath `/'.")
 
+(autoload 'git-link "git-link" nil t)
+
+(defun cmdr-git-link ()
+  "Invoke `git-link' ensuring the generated URL is copied to the OS clipboard."
+  (interactive)
+  (let ((select-enable-clipboard t))
+    (call-interactively #'git-link)))
+
 (cmdr-register-spec
   :name magit
   :probe magit-status
@@ -36,7 +44,7 @@
   :bindings (("C-x g s" . magit-status)
              ("C-x g f" . magit-branch)
              ("C-x g b" . magit-blame)
-             ("C-x g l" . git-link)
+             ("C-x g l" . cmdr-git-link)
              ("C-x g x" . execute-extended-magit-command))
   :keymap-bindings ((magit magit-mode-map
                      :prefixes (("/" "magit-command" magit-command-mode-map))

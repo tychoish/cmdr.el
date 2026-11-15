@@ -87,7 +87,7 @@
     ("C-x f" . find-file)
     ("C-x g b" . magit-blame)
     ("C-x g f" . magit-branch)
-    ("C-x g l" . git-link)
+    ("C-x g l" . cmdr-git-link)
     ("C-x g m k" . smerge-kill-current)
     ("C-x g m n" . smerge-vc-next-conflict)
     ("C-x g m r" . smerge-kill-and-vc-next-conflict)

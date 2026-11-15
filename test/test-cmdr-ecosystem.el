@@ -42,5 +42,18 @@
     (should (eq (keymap-lookup magit-command-mode-map "x") 'execute-extended-magit-command))
     (should (eq (keymap-lookup magit-command-mode-map "m") 'execute-extended-smerge-command))))
 
+(ert-deftest cmdr-ecosystem-test/cmdr-git-link-enables-clipboard ()
+  "Invoking `cmdr-git-link' forces `select-enable-clipboard' to t."
+  (let ((select-enable-clipboard nil)
+        captured)
+    (should (fboundp 'cmdr-git-link))
+    (cl-letf (((symbol-function 'call-interactively)
+               (lambda (fn &rest _)
+                 (when (eq fn #'git-link)
+                   (setq captured select-enable-clipboard)))))
+      (cmdr-git-link)
+      (should (eq captured t))
+      (should (eq select-enable-clipboard nil)))))
+
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here

@@ -92,7 +92,8 @@ PREFIXES is a list of (KEY . LABEL), BINDINGS a list of (KEY . COMMAND),
 DEFERRED-KEYMAPS a list of (KEY PACKAGE KEYMAP-SYMBOL LABEL).  COMMANDS is a
 list of `cmdr-spec-command' forms and is the one argument that is evaluated.
 KEYMAP-BINDINGS is a list of (PACKAGE KEYMAP-SYMBOL . SPEC) defining bindings
-in external keymaps when PACKAGE loads."
+in external keymaps immediately if available, or via mode hooks.  SPEC may include
+:hook to specify custom activation hook(s)."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
@@ -186,6 +187,25 @@ and does not stop the others."
                 (error (cmdr-spec--record-failure spec "registering commands" err))))
             specs)))
 
+(defun cmdr-spec--apply-keymap-bindings (keymap-symbol prefixes bindings)
+  "Apply PREFIXES and BINDINGS to KEYMAP-SYMBOL if it is bound to a keymap.
+Return non-nil if applied, nil otherwise."
+  (let ((map (if (symbolp keymap-symbol)
+                 (and (boundp keymap-symbol) (symbol-value keymap-symbol))
+               keymap-symbol)))
+    (when (keymapp map)
+      (seq-do (pcase-lambda (`(,key . ,rest-prefix))
+                (let ((label (if (consp rest-prefix) (car rest-prefix) rest-prefix))
+                      (var (when (consp rest-prefix) (cadr rest-prefix))))
+                  (let ((child (cmdr-keys-prefix map key label)))
+                    (when var
+                      (set var child)))))
+              prefixes)
+      (seq-do (pcase-lambda (`(,key . ,command))
+                (cmdr-keys-set map key (cmdr-spec--normalize-command command)))
+              bindings)
+      t)))
+
 ;;;###autoload
 (defun cmdr-spec-install (name)
   "Install the spec called NAME into `cmdr-mode-map', ignoring its probe.
@@ -206,28 +226,44 @@ Installing again is idempotent."
               (unless (keymap-lookup cmdr-mode-map key)
                 (cmdr-bind-deferred-keymap cmdr-mode-map key package keymap-symbol label)))
             (cmdr-spec-deferred-keymaps spec))
-    (seq-do (pcase-lambda (`(,package ,keymap-symbol . ,rest))
-              (let* ((prefixes (if (keywordp (car-safe rest))
-                                   (plist-get rest :prefixes)
-                                 nil))
-                     (bindings (if (keywordp (car-safe rest))
-                                   (plist-get rest :bindings)
-                                 rest)))
-                (with-eval-after-load package
-                  (let ((map (if (symbolp keymap-symbol)
-                                 (and (boundp keymap-symbol) (symbol-value keymap-symbol))
-                               keymap-symbol)))
-                    (when (keymapp map)
-                      (seq-do (pcase-lambda (`(,key . ,rest-prefix))
-                                (let ((label (if (consp rest-prefix) (car rest-prefix) rest-prefix))
-                                      (var (when (consp rest-prefix) (cadr rest-prefix))))
-                                  (let ((child (cmdr-keys-prefix map key label)))
-                                    (when var
-                                      (set var child)))))
-                              prefixes)
-                      (seq-do (pcase-lambda (`(,key . ,command))
-                                (cmdr-keys-set map key (cmdr-spec--normalize-command command)))
-                              bindings))))))
+    (seq-do (pcase-lambda (`(,_package ,keymap-symbol . ,rest))
+              (let* ((hook-opt (when (keywordp (car-safe rest)) (plist-get rest :hook)))
+                     (prefixes (when (keywordp (car-safe rest)) (plist-get rest :prefixes)))
+                     (bindings (cond
+                                ((and (keywordp (car-safe rest)) (plist-member rest :bindings))
+                                 (plist-get rest :bindings))
+                                ((keywordp (car-safe rest))
+                                 (let ((rem rest)
+                                       (shorthand nil))
+                                   (while rem
+                                     (if (keywordp (car rem))
+                                         (setq rem (cddr rem))
+                                       (push (car rem) shorthand)
+                                       (setq rem (cdr rem))))
+                                   (nreverse shorthand)))
+                                (t rest))))
+                (unless (cmdr-spec--apply-keymap-bindings keymap-symbol prefixes bindings)
+                  (let* ((hooks (ensure-list
+                                 (or hook-opt
+                                     (let ((name (symbol-name keymap-symbol)))
+                                       (cond
+                                        ((string-suffix-p "-global-map" name)
+                                         (list (intern (format "%s-global-mode-hook" (string-remove-suffix "-global-map" name)))
+                                               (intern (format "%s-mode-hook" (string-remove-suffix "-global-map" name)))))
+                                        ((string-suffix-p "-mode-map" name)
+                                         (list (intern (format "%s-mode-hook" (string-remove-suffix "-mode-map" name)))))
+                                        ((string-suffix-p "-map" name)
+                                         (list (intern (format "%s-hook" (string-remove-suffix "-map" name)))))
+                                        (t
+                                         (list (intern (format "%s-hook" name)))))))))
+                         (installer nil))
+                    (setq installer
+                          (lambda (&rest _)
+                            (when (cmdr-spec--apply-keymap-bindings keymap-symbol prefixes bindings)
+                              (dolist (h hooks)
+                                (remove-hook h installer)))))
+                    (dolist (h hooks)
+                      (add-hook h installer))))))
             (ignore-errors (cmdr-spec-keymap-bindings spec)))
     (when (cmdr-spec-commands spec)
       (setq cmdr-spec--pending (cons spec (delq spec cmdr-spec--pending)))

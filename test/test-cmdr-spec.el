@@ -213,5 +213,54 @@
     (cmdr-spec-install 'ext-feature2)
     (should (eq (keymap-lookup test-cmdr-spec--shorthand-map "a") 'ignore))))
 
+(defvar test-cmdr-spec--deferred-hook nil)
+(defvar test-cmdr-spec--deferred-map nil)
+
+(ert-deftest cmdr-spec-test/keymap-bindings-deferred-via-explicit-hook ()
+  (cmdr-spec-test--with-table
+    (setq test-cmdr-spec--deferred-hook nil
+          test-cmdr-spec--deferred-map nil)
+    (cmdr-register-spec
+      :name ext-deferred
+      :probe "ert"
+      :keymap-bindings
+      ((test-pkg test-cmdr-spec--deferred-map
+        :hook test-cmdr-spec--deferred-hook
+        ("d" . 'ignore))))
+    (cmdr-spec-install 'ext-deferred)
+    ;; Map not defined yet, hook should be waiting
+    (should test-cmdr-spec--deferred-hook)
+    ;; Package/mode activates and initializes the map
+    (setq test-cmdr-spec--deferred-map (make-sparse-keymap))
+    (run-hooks 'test-cmdr-spec--deferred-hook)
+    ;; Key should now be bound
+    (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") 'ignore))
+    ;; One-shot hook should have removed itself
+    (should-not test-cmdr-spec--deferred-hook)))
+
+(defvar test-cmdr-sample-mode-hook nil)
+(defvar test-cmdr-sample-mode-map nil)
+
+(ert-deftest cmdr-spec-test/keymap-bindings-deferred-via-derived-mode-hook ()
+  (cmdr-spec-test--with-table
+    (setq test-cmdr-sample-mode-hook nil
+          test-cmdr-sample-mode-map nil)
+    (cmdr-register-spec
+      :name ext-derived-hook
+      :probe "ert"
+      :keymap-bindings
+      ((test-pkg test-cmdr-sample-mode-map
+        ("m" . 'ignore))))
+    (cmdr-spec-install 'ext-derived-hook)
+    ;; Map not defined yet, derived test-cmdr-sample-mode-hook should be waiting
+    (should test-cmdr-sample-mode-hook)
+    ;; Package/mode activates
+    (setq test-cmdr-sample-mode-map (make-sparse-keymap))
+    (run-hooks 'test-cmdr-sample-mode-hook)
+    ;; Key should now be bound
+    (should (eq (keymap-lookup test-cmdr-sample-mode-map "m") 'ignore))
+    ;; One-shot hook should have removed itself
+    (should-not test-cmdr-sample-mode-hook)))
+
 (provide 'test-cmdr-spec)
 ;;; test-cmdr-spec.el ends here
