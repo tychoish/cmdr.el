@@ -92,8 +92,8 @@ PREFIXES is a list of (KEY . LABEL), BINDINGS a list of (KEY . COMMAND),
 DEFERRED-KEYMAPS a list of (KEY PACKAGE KEYMAP-SYMBOL LABEL).  COMMANDS is a
 list of `cmdr-spec-command' forms and is the one argument that is evaluated.
 KEYMAP-BINDINGS is a list of (PACKAGE KEYMAP-SYMBOL . SPEC) defining bindings
-in external keymaps immediately if available, or via mode hooks.  SPEC may include
-:hook to specify custom activation hook(s)."
+in external keymaps immediately if available, or via mode hooks.
+SPEC may include :hook to specify custom activation hook(s)."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
