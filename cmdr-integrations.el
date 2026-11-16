@@ -34,7 +34,9 @@
   :name denote
   :probe denote-dash
   :keymap-bindings ((denote-dash denote-dash-global-map
-                     ("x" . (cons "denote-commands" 'execute-extended-denote-command))))
+                     ("x" . (cons "denote-commands" 'execute-extended-denote-command)))
+                    (denote-dash denote-dash-org-map
+                     ("r" . denote-convert-subtree)))
   :commands ((cmdr-spec-command :category denote
                                 :command denote-dash
                                 :description "denote list"
