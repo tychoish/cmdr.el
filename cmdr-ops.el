@@ -24,8 +24,65 @@
 (declare-function org-metadown "org")
 (declare-function annotated-completing-read-directory "annotated-completing-read")
 (declare-function kill-buffer-ask "files")
+(declare-function annotated-completing-read "annotated-completing-read")
+(declare-function project-current "project")
+(declare-function project-root "project")
+(defvar popper-open-popup-alist)
+(defvar popper-buried-popup-alist)
 (defvar package-user-dir)
 (defvar package-directory-list)
+
+;;; Popups
+
+(defun popup-buffers ()
+  "Return live popper popup buffers from every group, open or buried.
+Unlike `popper-cycle', this ignores `popper-group-function', so popups
+outside the current project are included."
+  (thread-last
+    (append popper-open-popup-alist
+            (seq-mapcat #'cdr popper-buried-popup-alist))
+    (seq-map #'cdr)
+    (seq-filter #'buffer-live-p)
+    (seq-uniq)))
+
+(defun cmdr--buffer-age (buffer)
+  "Return a short string for the time since BUFFER was last displayed."
+  (if-let* ((time (buffer-local-value 'buffer-display-time buffer)))
+      (let ((secs (float-time (time-since time))))
+        (cond ((< secs 60) (format "%ds" secs))
+              ((< secs 3600) (format "%dm" (/ secs 60)))
+              ((< secs 86400) (format "%dh" (/ secs 3600)))
+              (t (format "%dd" (/ secs 86400)))))
+    "never"))
+
+(defun cmdr--buffer-project-name (buffer)
+  "Return the project name for BUFFER, or \"-\" when it has none."
+  (with-current-buffer buffer
+    (if-let* ((project (project-current)))
+        (file-name-nondirectory (directory-file-name (project-root project)))
+      "-")))
+
+;;;###autoload
+(defun switch-to-popup-buffer ()
+  "Pick any popper popup buffer, regardless of project group, and display it.
+Candidates are annotated with project, age since last display, size and mode."
+  (interactive)
+  (require 'annotated-completing-read)
+  (if-let* ((buffers (popup-buffers)))
+      (display-buffer
+       (annotated-completing-read
+        (seq-map (lambda (buf)
+                   (cons (buffer-name buf)
+                         (format "%-14s %6s %8s  %s"
+                                 (cmdr--buffer-project-name buf)
+                                 (cmdr--buffer-age buf)
+                                 (file-size-human-readable (buffer-size buf))
+                                 (buffer-local-value 'mode-name buf))))
+                 buffers)
+        :prompt "Popup: "
+        :category 'buffer
+        :require-match t))
+    (user-error "No popups")))
 
 ;;; Paths
 

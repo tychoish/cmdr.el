@@ -122,6 +122,7 @@
 (autoload 'popper-cycle "popper" nil t)
 (autoload 'popper-kill-latest-popup "popper" nil t)
 (autoload 'popper-toggle-type "popper" nil t)
+(autoload 'switch-to-popup-buffer "cmdr-ops" nil t)
 
 (cmdr-register-spec
   :name popper
@@ -129,6 +130,7 @@
   :bindings (("C-c '" . popper-toggle)
              ("C-c C-'" . popper-toggle)
              ("C-c \\" . popper-cycle)
+             ("C-c /" . switch-to-popup-buffer)
              ("C-c M-'" . popper-kill-latest-popup)
              ("C-c C-M-'" . popper-toggle-type)))
 

@@ -784,5 +784,32 @@
       (call-interactively #'set-up-frame-font)
       (should (equal "Chosen-15" (alist-get 'font default-frame-alist))))))
 
+;; Popups
+
+(defvar popper-open-popup-alist)
+(defvar popper-buried-popup-alist)
+
+(ert-deftest cmdr-ops-test/popup-buffers-spans-all-groups ()
+  "Popup buffers from every group, open and buried, are returned once."
+  (let ((a (generate-new-buffer " *pop-a*"))
+        (b (generate-new-buffer " *pop-b*"))
+        (dead (generate-new-buffer " *pop-dead*")))
+    (kill-buffer dead)
+    (unwind-protect
+        (let ((popper-open-popup-alist (list (cons nil a)))
+              (popper-buried-popup-alist
+               (list (cons "proj" (list (cons nil b) (cons nil a)))
+                     (cons nil (list (cons nil dead))))))
+          (should (equal (sort (seq-map #'buffer-name (popup-buffers)) #'string<)
+                         (list (buffer-name a) (buffer-name b)))))
+      (kill-buffer a)
+      (kill-buffer b))))
+
+(ert-deftest cmdr-ops-test/buffer-age-never-displayed ()
+  "A buffer never displayed reports \"never\"."
+  (with-temp-buffer
+    (setq buffer-display-time nil)
+    (should (equal "never" (cmdr--buffer-age (current-buffer))))))
+
 (provide 'test-cmdr-ops)
 ;;; test-cmdr-ops.el ends here
