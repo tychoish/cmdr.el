@@ -154,6 +154,14 @@
     (should-error (cmdr-keys-set map "C-c a" #'ignore) :type 'user-error)
     (should (keymapp (lookup-key map (kbd "C-c a"))))))
 
+(ert-deftest cmdr-keys-test/set-allows-rebinding-prefix-submap ()
+  "Binding a keymap or labelled keymap onto an existing prefix is idempotent."
+  (let ((map (make-sparse-keymap))
+        (sub (make-sparse-keymap)))
+    (cmdr-keys-set map "C-c j" (cons "sub" sub))
+    (cmdr-keys-set map "C-c j" (cons "sub" sub))
+    (should (eq sub (lookup-key map (kbd "C-c j"))))))
+
 (ert-deftest cmdr-keys-test/set-creates-intermediate-prefixes-and-rebinds ()
   "Setting a full sequence creates parents; setting it again replaces the command."
   (let ((map (make-sparse-keymap)))
