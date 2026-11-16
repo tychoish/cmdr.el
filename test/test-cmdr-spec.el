@@ -262,5 +262,35 @@
     ;; One-shot hook should have removed itself
     (should-not test-cmdr-sample-mode-hook)))
 
+(ert-deftest cmdr-spec-test/transient-suffixes-install-immediate-and-deferred ()
+  (cmdr-spec-test--with-table
+    (let ((inserted nil)
+          (cmdr-spec--pending-transient-suffixes nil))
+      (put 'test-cmdr-spec--prefix 'transient--layout t)
+      (unwind-protect
+          (cl-letf (((symbol-function 'cmdr-transient-insert-suffix-once)
+                     (lambda (prefix loc suffix)
+                       (push (list prefix loc suffix) inserted))))
+            (cmdr-register-spec
+              :name test-ts
+              :probe "ert"
+              :transient-suffixes
+              ((test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore))
+               (test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore))))
+            (cmdr-spec-install 'test-ts)
+            (should (equal inserted
+                           '((test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore)))))
+            (should (equal cmdr-spec--pending-transient-suffixes
+                           '((test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore)))))
+            (put 'test-cmdr-spec--deferred-prefix 'transient--layout t)
+            (cmdr-spec--flush-transient-suffixes)
+            (should-not cmdr-spec--pending-transient-suffixes)
+            (should (equal inserted
+                           '((test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore))
+                             (test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore))))))
+        (put 'test-cmdr-spec--prefix 'transient--layout nil)
+        (put 'test-cmdr-spec--deferred-prefix 'transient--layout nil)
+        (remove-hook 'after-load-functions #'cmdr-spec--flush-transient-suffixes)))))
+
 (provide 'test-cmdr-spec)
 ;;; test-cmdr-spec.el ends here
