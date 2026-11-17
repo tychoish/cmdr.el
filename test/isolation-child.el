@@ -81,9 +81,11 @@
   "Check that loading and toggling cmdr changes only what it should, then exit."
   (require 'transient)
   (require 'annotated-completing-read)
+  (require 'which-key)
   (let* ((before (cmdr-isolation--snapshot))
          (ok t))
     (seq-do #'require '(cmdr cmdr-keys cmdr-mode cmdr-macros cmdr-ops))
+    (setq cmdr-which-key-integration nil)
     (cmdr-keys-prefix cmdr-mode-map "C-c a" "Apps")
     (cmdr-keys-set cmdr-mode-map "C-c a f" #'ignore)
     (let* ((loaded (cmdr-isolation--snapshot))

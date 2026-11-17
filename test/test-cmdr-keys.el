@@ -271,8 +271,8 @@
           (should (equal before global-map)))
       (cmdr-mode (if was-on 1 -1)))))
 
-(ert-deftest cmdr-keys-test/which-key-not-required ()
-  (should-not (featurep 'which-key)))
+(ert-deftest cmdr-keys-test/which-key-required ()
+  (should (featurep 'which-key)))
 
 (ert-deftest cmdr-mode-test/which-key-hook-installed-and-removed ()
   "Enabling cmdr-mode installs which-key hook; disabling removes it."
