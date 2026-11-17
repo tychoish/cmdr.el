@@ -29,7 +29,7 @@ jobs:
       - name: Lint Source Code
         uses: tychoish/elisp-ci/lint@main
         with:
-          dependencies: "transient annotated-completing-read"
+          dependencies: "transient annotated-completing-read which-key"
           linters: "byte-compile checkdoc package-lint relint"
           required-linters: "byte-compile checkdoc"
 
