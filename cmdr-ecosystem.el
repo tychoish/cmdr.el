@@ -68,6 +68,7 @@
 (cmdr-register-spec
   :name docker
   :probe docker
+  :settings ((docker-terminal-backend . auto))
   :prefixes (("C-x d" . "docker"))
   :bindings (("C-x d d" . docker)
              ("C-x d c" . docker-containers)

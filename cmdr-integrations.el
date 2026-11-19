@@ -253,6 +253,7 @@
 (cmdr-register-spec
   :name whitespace
   :probe toggle-local-whitespace-cleanup
+  :settings ((whitespace-style . (face trailing tabs spaces lines newline missing-newline-at-eof empty space-mark tab-mark newline-mark)))
   :prefixes (("C-c t w" . "whitespace"))
   :bindings (("C-c t w c" . whitespace-cleanup)
              ("C-c t w t" . toggle-local-whitespace-cleanup)))
