@@ -88,6 +88,7 @@
 (cmdr-register-spec
   :name agent-shell
   :probe agent-shell
+  :settings ((popper-reference-buffers . (agent-shell-queue-item-view-mode)))
   :prefixes (("C-c r" . "robot")
              ("C-c r s" . "agent-shell")
              ("C-c r s s" . "send"))
@@ -185,6 +186,7 @@
 (cmdr-register-spec
   :name org
   :probe orgx-capture
+  :settings ((popper-reference-buffers . (orgx-capture-shell-mode)))
   :bindings (("M-o" . orgx-capture-shell-toggle))
   :commands ((cmdr-spec-command :row 2
                                 :category org-mode
@@ -205,6 +207,7 @@
 (cmdr-register-spec
   :name sprite
   :probe sprite-list
+  :settings ((popper-reference-buffers . (mcpkit-stats-mode logx-view-mode)))
   :commands ((cmdr-spec-command :row 2
                                 :category sprite
                                 :command sprite-list
@@ -224,6 +227,7 @@
 (cmdr-register-spec
   :name arch
   :probe arch-list
+  :settings ((popper-reference-buffers . (arch-install-mode)))
   :commands ((cmdr-spec-command :row 2
                                 :category arch
                                 :command arch-find-package
@@ -238,6 +242,7 @@
 (cmdr-register-spec
   :name elpaish
   :probe elpaish-install-upgrade-packages
+  :settings ((popper-reference-buffers . (elpaish-build-mode elpaish-check-mode elpaish-status-mode)))
   :transient-suffixes ((elpaish-menu (-1 -1 0) ("x" "extended elpaish commands" execute-extended-elpaish-command)))
   :commands ((cmdr-spec-command :row 2
                                 :category elpaish

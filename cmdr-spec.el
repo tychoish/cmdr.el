@@ -52,7 +52,7 @@ These contain only `cmdr-register-spec' forms and require nothing else."
 
 (cl-defstruct (cmdr-spec (:copier nil))
   "One feature's prefixes, bindings and registry commands."
-  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes)
+  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings)
 
 (cl-defstruct (cmdr-spec-command (:copier nil))
   "A registry command carried by a spec until `cmdr' loads.
@@ -84,7 +84,7 @@ function symbols or lambda forms."
                            :inapt ,(when ifapt `(function ,ifapt))
                            :exclude-from-transient ',exclude-from-transient))
 
-(cl-defmacro cmdr-register-spec (&key name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes)
+(cl-defmacro cmdr-register-spec (&key name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings)
   "Register or replace the spec NAME, a required symbol.
 Every argument is quoted data.
 PROBE is a function symbol (must be `fboundp') or library name string
@@ -99,7 +99,8 @@ KEYMAP-BINDINGS is a list of (PACKAGE KEYMAP-SYMBOL . SPEC) defining bindings
 in external keymaps immediately if available, or via mode hooks.
 SPEC may include :hook to specify custom activation hook(s).
 TRANSIENT-SUFFIXES is a list of (PACKAGE PREFIX LOC SUFFIX) or
-(PREFIX LOC SUFFIX) entries passed to `cmdr-transient-insert-suffix-once'."
+(PREFIX LOC SUFFIX) entries passed to `cmdr-transient-insert-suffix-once'.
+SETTINGS is an alist of (SYMBOL . VALUE) settings applied upon installation."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
@@ -110,7 +111,8 @@ TRANSIENT-SUFFIXES is a list of (PACKAGE PREFIX LOC SUFFIX) or
                                    :deferred-keymaps ',deferred-keymaps
                                    :commands (list ,@commands)
                                    :keymap-bindings ',keymap-bindings
-                                   :transient-suffixes ',transient-suffixes)))
+                                   :transient-suffixes ',transient-suffixes
+                                   :settings ',settings)))
 
 (defun cmdr-spec--put (spec)
   "Add SPEC to `cmdr-spec-table', replacing a same-named spec in place."
@@ -241,6 +243,43 @@ ENTRY is either (PREFIX LOC SUFFIX) or (PACKAGE PREFIX LOC SUFFIX)."
           (push norm cmdr-spec--pending-transient-suffixes))
         (add-hook 'after-load-functions #'cmdr-spec--flush-transient-suffixes)))))
 
+(defcustom cmdr-spec-merge-variables '(popper-reference-buffers)
+  "Variables whose setting values are merged as collections via `add-to-list'.
+Other variables are set via `set-default'."
+  :type '(repeat symbol)
+  :group 'cmdr-spec)
+
+(defvar cmdr-spec--saved-settings nil
+  "Alist of (SYMBOL . (BOUNDP . VALUE)) saved by `cmdr-spec--apply-settings'.")
+
+(defun cmdr-spec--apply-settings (settings)
+  "Apply SETTINGS alist, recording prior values for reversal."
+  (seq-do (pcase-lambda (`(,sym . ,val))
+            (unless (assq sym cmdr-spec--saved-settings)
+              (let ((prior (and (boundp sym) (symbol-value sym))))
+                (push (cons sym (if (boundp sym)
+                                    (cons t (if (consp prior) (copy-sequence prior) prior))
+                                  (cons nil nil)))
+                      cmdr-spec--saved-settings)))
+            (if (memq sym cmdr-spec-merge-variables)
+                (if (and (boundp sym) (consp (symbol-value sym)))
+                    (dolist (item val)
+                      (add-to-list sym item))
+                  (set-default sym (copy-sequence val)))
+              (set-default sym val)))
+          settings))
+
+(defun cmdr-spec--revert-settings ()
+  "Restore variables saved by `cmdr-spec--apply-settings'."
+  (seq-do (lambda (entry)
+            (let ((sym (car entry))
+                  (status (cdr entry)))
+              (if (car status)
+                  (set-default sym (cdr status))
+                (makunbound sym))))
+          cmdr-spec--saved-settings)
+  (setq cmdr-spec--saved-settings nil))
+
 ;;;###autoload
 (defun cmdr-spec-install (name)
   "Install the spec called NAME into `cmdr-mode-map', ignoring its probe.
@@ -306,6 +345,8 @@ Installing again is idempotent."
       (setq cmdr-spec--pending (cons spec (delq spec cmdr-spec--pending)))
       (when (featurep 'cmdr)
         (cmdr-spec-flush-commands)))
+    (when (cmdr-spec-settings spec)
+      (cmdr-spec--apply-settings (cmdr-spec-settings spec)))
     spec))
 
 ;;;###autoload

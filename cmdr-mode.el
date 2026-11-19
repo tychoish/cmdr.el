@@ -32,6 +32,39 @@ This configuration is attached to `which-key-mode-hook'."
   :type 'boolean
   :group 'convenience)
 
+(defcustom cmdr-mode-managed-settings
+  '((which-key-idle-delay . 0.25)
+    (which-key-idle-secondary-delay . 0.125)
+    (which-key-lighter . ""))
+  "Alist of (SYMBOL . VALUE) settings managed globally by `cmdr-mode'."
+  :type '(alist :key-type symbol :value-type sexp)
+  :group 'convenience)
+
+(defvar cmdr-mode--saved-settings nil
+  "Alist of (SYMBOL . (BOUNDP . VALUE)) saved before enabling `cmdr-mode'.")
+
+(defun cmdr-mode--apply-settings ()
+  "Save previous values and apply `cmdr-mode-managed-settings'."
+  (setq cmdr-mode--saved-settings nil)
+  (seq-do (lambda (pair)
+            (let ((sym (car pair))
+                  (val (cdr pair)))
+              (push (cons sym (if (boundp sym) (cons t (symbol-value sym)) (cons nil nil)))
+                    cmdr-mode--saved-settings)
+              (set sym val)))
+          cmdr-mode-managed-settings))
+
+(defun cmdr-mode--revert-settings ()
+  "Restore variables to their state prior to `cmdr-mode'."
+  (seq-do (lambda (entry)
+            (let ((sym (car entry))
+                  (status (cdr entry)))
+              (if (car status)
+                  (set-default sym (cdr status))
+                (makunbound sym))))
+          cmdr-mode--saved-settings)
+  (setq cmdr-mode--saved-settings nil))
+
 (defun cmdr-mode--setup-which-key ()
   "Configure `which-key' to display in bottom side window."
   (when (fboundp 'which-key-setup-side-window-bottom)
@@ -48,10 +81,8 @@ side-window-bottom display and use the cmdr interactive font prompt."
   (if cmdr-mode
       (progn
         (advice-add 'set-frame-font :around #'cmdr-set-frame-font-interactive)
+        (cmdr-mode--apply-settings)
         (when cmdr-which-key-integration
-          (setq which-key-idle-delay 0.25)
-          (setq which-key-idle-secondary-delay 0.125)
-          (setq which-key-lighter "")
           (add-hook 'which-key-mode-hook #'cmdr-mode--setup-which-key)
           (which-key-mode 1)
           (when (bound-and-true-p which-key-mode)
@@ -61,7 +92,8 @@ side-window-bottom display and use the cmdr interactive font prompt."
     (when (and (boundp 'which-key-mode-hook)
                (null which-key-mode-hook)
                (not (featurep 'which-key)))
-      (makunbound 'which-key-mode-hook))))
+      (makunbound 'which-key-mode-hook))
+    (cmdr-mode--revert-settings)))
 
 ;;;###autoload
 (defalias 'cmdr-global-minor-mode #'cmdr-mode)

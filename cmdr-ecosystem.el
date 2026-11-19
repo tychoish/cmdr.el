@@ -132,7 +132,24 @@
              ("C-c \\" . popper-cycle)
              ("C-c /" . switch-to-popup-buffer)
              ("C-c M-'" . popper-kill-latest-popup)
-             ("C-c C-M-'" . popper-toggle-type)))
+             ("C-c C-M-'" . popper-toggle-type))
+  :settings ((popper-display-control . nil)
+             (popper-echo-dispatch-keys . ("C-1" "C-2" "C-3" "C-4" "C-5" "C-6" "C-7" "C-8" "C-9"))
+             (popper-reference-buffers . (help-mode
+                                          message-mode
+                                          backtrace-mode
+                                          compilation-mode
+                                          ert-results-mode
+                                          deadgrep-mode
+                                          "\\*Messages\\*"
+                                          "\\*Warnings\\*"
+                                          "\\*Backtrace\\*"
+                                          "\\*Compile-Log\\*"
+                                          "\\*compilation\\*"
+                                          "\\*grep\\*"
+                                          "\\*xref\\*"
+                                          "\\*Flymake diagnostics.*\\*"
+                                          "\\*ert.*\\*"))))
 
 (cmdr-register-spec
   :name dape

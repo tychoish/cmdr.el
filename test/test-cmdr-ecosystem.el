@@ -29,7 +29,10 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c \\") #'popper-cycle))
     (should (eq (keymap-lookup cmdr-mode-map "C-c /") #'switch-to-popup-buffer))
     (should (eq (keymap-lookup cmdr-mode-map "C-c M-'") #'popper-kill-latest-popup))
-    (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))
+    (should (eq popper-display-control nil))
+    (should (member 'help-mode popper-reference-buffers))
+    (should (member "\\*compilation\\*" popper-reference-buffers))))
 
 (defvar magit-mode-map nil)
 

@@ -23,6 +23,7 @@
          (cmdr-spec-libraries nil)
          (cmdr-disabled-specs nil)
          (cmdr-opt-in-specs nil)
+         (cmdr-spec--saved-settings nil)
          (cmdr-mode-map (make-sparse-keymap)))
      ,@body))
 
@@ -291,6 +292,34 @@
         (put 'test-cmdr-spec--prefix 'transient--layout nil)
         (put 'test-cmdr-spec--deferred-prefix 'transient--layout nil)
         (remove-hook 'after-load-functions #'cmdr-spec--flush-transient-suffixes)))))
+
+(defvar cmdr-spec-test--scalar nil)
+(defvar cmdr-spec-test--collection nil)
+
+(ert-deftest cmdr-spec-test/settings-apply-and-revert ()
+  "Specs apply settings on install and revert cleanly."
+  (cmdr-spec-test--with-table
+    (let ((cmdr-spec-merge-variables '(cmdr-spec-test--collection))
+          (cmdr-spec-test--scalar 'orig)
+          (cmdr-spec-test--collection '(a b)))
+      (unwind-protect
+          (progn
+            (cmdr-register-spec
+              :name test-settings
+              :settings ((cmdr-spec-test--scalar . updated)
+                         (cmdr-spec-test--collection . (c d))))
+            (cmdr-spec-install 'test-settings)
+            (should (eq cmdr-spec-test--scalar 'updated))
+            (should (member 'c cmdr-spec-test--collection))
+            (should (member 'd cmdr-spec-test--collection))
+            (should (member 'a cmdr-spec-test--collection))
+            ;; Idempotent on second install
+            (cmdr-spec-install 'test-settings)
+            (should (equal (length cmdr-spec-test--collection) 4))
+            (cmdr-spec--revert-settings)
+            (should (eq cmdr-spec-test--scalar 'orig))
+            (should (equal cmdr-spec-test--collection '(a b))))
+        (cmdr-spec--revert-settings)))))
 
 (provide 'test-cmdr-spec)
 ;;; test-cmdr-spec.el ends here
