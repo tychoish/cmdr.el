@@ -24,6 +24,7 @@
          (cmdr-disabled-specs nil)
          (cmdr-opt-in-specs nil)
          (cmdr-spec--saved-settings nil)
+         (cmdr-spec--activate-scheduled nil)
          (cmdr-mode-map (make-sparse-keymap)))
      ,@body))
 
@@ -320,6 +321,70 @@
             (should (eq cmdr-spec-test--scalar 'orig))
             (should (equal cmdr-spec-test--collection '(a b))))
         (cmdr-spec--revert-settings)))))
+
+(defvar cmdr-spec-test--inst-count 0)
+(defun cmdr-spec-test--inst-fn ()
+  (cl-incf cmdr-spec-test--inst-count))
+
+(defvar cmdr-spec-test--external-ran nil)
+(defun cmdr-spec-test--external-fn ()
+  (setq cmdr-spec-test--external-ran t))
+
+(ert-deftest cmdr-spec-test/install-hook-runs-on-install ()
+  "Specs run install hook on installation, both from :install-hook and via add-hook."
+  (cmdr-spec-test--with-table
+    (setq cmdr-spec-test--inst-count 0
+          cmdr-spec-test--external-ran nil)
+    (cmdr-register-spec
+      :name test-inst
+      :install-hook #'cmdr-spec-test--inst-fn)
+    (add-hook 'cmdr-spec-test-inst-install-hook #'cmdr-spec-test--external-fn)
+    (should (= cmdr-spec-test--inst-count 0))
+    (should-not cmdr-spec-test--external-ran)
+    (cmdr-spec-install 'test-inst)
+    (should (= cmdr-spec-test--inst-count 1))
+    (should cmdr-spec-test--external-ran)))
+
+(defvar cmdr-spec-test--already-ran nil)
+(defun cmdr-spec-test--already-fn ()
+  (setq cmdr-spec-test--already-ran t))
+
+(defvar cmdr-spec-test--deferred-ran nil)
+(defun cmdr-spec-test--deferred-fn ()
+  (setq cmdr-spec-test--deferred-ran t))
+
+(ert-deftest cmdr-spec-test/activate-hook-runs-on-feature-load ()
+  "Specs run activate hook when their feature loads, or immediately if already loaded."
+  (cmdr-spec-test--with-table
+    ;; 1. Already loaded feature ("ert")
+    (setq cmdr-spec-test--already-ran nil)
+    (cmdr-register-spec
+      :name test-already
+      :probe "ert"
+      :activate-hook #'cmdr-spec-test--already-fn)
+    (should-not cmdr-spec-test--already-ran)
+    (cmdr-spec-install 'test-already)
+    (should cmdr-spec-test--already-ran)
+    ;; 2. Deferred feature loaded later
+    (setq cmdr-spec-test--deferred-ran nil)
+    (setq features (delq 'cmdr-test-deferred-feature features))
+    (unwind-protect
+        (progn
+          (cmdr-register-spec
+            :name test-defer
+            :feature cmdr-test-deferred-feature
+            :activate-hook #'cmdr-spec-test--deferred-fn)
+          (cmdr-spec-install 'test-defer)
+          (should-not cmdr-spec-test--deferred-ran)
+          (provide 'cmdr-test-deferred-feature)
+          (should cmdr-spec-test--deferred-ran))
+      (setq features (delq 'cmdr-test-deferred-feature features)))))
+
+(ert-deftest cmdr-spec-test/hook-rejects-anonymous-function ()
+  "Reject anonymous lambdas as hook arguments in cmdr-register-spec."
+  (should-error
+   (macroexpand '(cmdr-register-spec :name bad :install-hook (lambda () nil)))
+   :type 'user-error))
 
 (provide 'test-cmdr-spec)
 ;;; test-cmdr-spec.el ends here

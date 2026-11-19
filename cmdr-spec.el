@@ -52,7 +52,7 @@ These contain only `cmdr-register-spec' forms and require nothing else."
 
 (cl-defstruct (cmdr-spec (:copier nil))
   "One feature's prefixes, bindings and registry commands."
-  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings)
+  name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings feature install-hook activate-hook)
 
 (cl-defstruct (cmdr-spec-command (:copier nil))
   "A registry command carried by a spec until `cmdr' loads.
@@ -84,38 +84,125 @@ function symbols or lambda forms."
                            :inapt ,(when ifapt `(function ,ifapt))
                            :exclude-from-transient ',exclude-from-transient))
 
-(cl-defmacro cmdr-register-spec (&key name doc probe autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings)
+(defun cmdr-spec--install-hook-name (name)
+  "Return the install hook variable symbol for spec NAME."
+  (intern (format "cmdr-spec-%s-install-hook" name)))
+
+(defun cmdr-spec--activate-hook-name (name)
+  "Return the activate hook variable symbol for spec NAME."
+  (intern (format "cmdr-spec-%s-activate-hook" name)))
+
+(defun cmdr-spec--define-hooks (name)
+  "Ensure install and activate hook variables are defined for spec NAME."
+  (let ((inst-hook (cmdr-spec--install-hook-name name))
+        (act-hook (cmdr-spec--activate-hook-name name)))
+    (unless (boundp inst-hook)
+      (set inst-hook nil)
+      (put inst-hook 'custom-type 'hook)
+      (put inst-hook 'variable-documentation
+           (format "Hook run immediately when cmdr spec `%s' is installed." name)))
+    (unless (boundp act-hook)
+      (set act-hook nil)
+      (put act-hook 'custom-type 'hook)
+      (put act-hook 'variable-documentation
+           (format "Hook run when the feature for cmdr spec `%s' is loaded/activated." name)))))
+
+(defun cmdr-spec--hook-function-symbol-p (x)
+  "Return non-nil when X is a named function reference."
+  (or (and (symbolp x) x)
+      (and (consp x)
+           (memq (car x) '(function quote))
+           (symbolp (cadr x))
+           (cadr x))))
+
+(defun cmdr-spec--normalize-hook-function (form)
+  "Normalize FORM to a named function symbol or form."
+  (cond
+   ((and (consp form) (eq (car form) 'function) (symbolp (cadr form)))
+    form)
+   ((and (consp form) (eq (car form) 'quote) (symbolp (cadr form)))
+    `(function ,(cadr form)))
+   ((and (symbolp form) form)
+    `(function ,form))
+   (t
+    (user-error "Hook function must be a named function symbol, got %S" form))))
+
+(defun cmdr-spec--normalize-hook-arg (arg)
+  "Normalize ARG into an expression returning a list of functions."
+  (cond
+   ((null arg) nil)
+   ((and (consp arg)
+         (not (memq (car arg) '(function quote lambda)))
+         (seq-every-p #'cmdr-spec--hook-function-symbol-p arg))
+    `(list ,@(mapcar #'cmdr-spec--normalize-hook-function arg)))
+   (t
+    `(list ,(cmdr-spec--normalize-hook-function arg)))))
+
+(defun cmdr-spec--register-hooks (name install-functions activate-functions)
+  "Define and attach INSTALL-FUNCTIONS and ACTIVATE-FUNCTIONS for spec NAME."
+  (cmdr-spec--define-hooks name)
+  (dolist (fn install-functions)
+    (add-hook (cmdr-spec--install-hook-name name) fn))
+  (dolist (fn activate-functions)
+    (add-hook (cmdr-spec--activate-hook-name name) fn)))
+
+(cl-defmacro cmdr-register-spec (&key name doc probe feature autoloads opt-in prefixes bindings deferred-keymaps commands keymap-bindings transient-suffixes settings install-hook activate-hook)
   "Register or replace the spec NAME, a required symbol.
-Every argument is quoted data.
+Every argument is quoted data, except COMMANDS, INSTALL-HOOK, and ACTIVATE-HOOK.
 PROBE is a function symbol (must be `fboundp') or library name string
 (must be found by `locate-library'), or a list of them, all of which must hold.
+FEATURE is the feature symbol whose loading triggers ACTIVATE-HOOK; defaults
+to PROBE if a library, or NAME.
 AUTOLOADS is a library name or list of names that installing loads when
 `locate-library' finds them.
 OPT-IN non-nil installs only when NAME is in `cmdr-opt-in-specs'.
 PREFIXES is a list of (KEY . LABEL), BINDINGS a list of (KEY . COMMAND),
 DEFERRED-KEYMAPS a list of (KEY PACKAGE KEYMAP-SYMBOL LABEL).  COMMANDS is a
-list of `cmdr-spec-command' forms and is the one argument that is evaluated.
+list of `cmdr-spec-command' forms.
 KEYMAP-BINDINGS is a list of (PACKAGE KEYMAP-SYMBOL . SPEC) defining bindings
 in external keymaps immediately if available, or via mode hooks.
 SPEC may include :hook to specify custom activation hook(s).
 TRANSIENT-SUFFIXES is a list of (PACKAGE PREFIX LOC SUFFIX) or
 (PREFIX LOC SUFFIX) entries passed to `cmdr-transient-insert-suffix-once'.
-SETTINGS is an alist of (SYMBOL . VALUE) settings applied upon installation."
+SETTINGS is an alist of (SYMBOL . VALUE) settings applied upon installation.
+INSTALL-HOOK is a function, lambda, or list of functions run when the spec is installed.
+ACTIVATE-HOOK is a function, lambda, or list of functions run when FEATURE is loaded."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
-  `(cmdr-spec--put (make-cmdr-spec :name ',name :doc ,doc :probe ',probe
-                                   :autoloads ',autoloads
-                                   :opt-in ',opt-in :prefixes ',prefixes
-                                   :bindings ',bindings
-                                   :deferred-keymaps ',deferred-keymaps
-                                   :commands (list ,@commands)
-                                   :keymap-bindings ',keymap-bindings
-                                   :transient-suffixes ',transient-suffixes
-                                   :settings ',settings)))
+  `(let* ((inst-funcs ,(cmdr-spec--normalize-hook-arg install-hook))
+          (act-funcs ,(cmdr-spec--normalize-hook-arg activate-hook))
+          (spec (make-cmdr-spec :name ',name :doc ,doc :probe ',probe
+                                :feature ',(if (and (consp feature) (eq (car feature) 'quote))
+                                               (cadr feature)
+                                             feature)
+                                :autoloads ',autoloads
+                                :opt-in ',opt-in :prefixes ',prefixes
+                                :bindings ',bindings
+                                :deferred-keymaps ',deferred-keymaps
+                                :commands (list ,@commands)
+                                :keymap-bindings ',keymap-bindings
+                                :transient-suffixes ',transient-suffixes
+                                :settings ',settings
+                                :install-hook inst-funcs
+                                :activate-hook act-funcs)))
+     (cmdr-spec--define-hooks ',name)
+     (when inst-funcs
+       (cmdr-spec--register-hooks ',name inst-funcs nil))
+     (when act-funcs
+       (cmdr-spec--register-hooks ',name nil act-funcs))
+     (cmdr-spec--put spec)))
 
 (defun cmdr-spec--put (spec)
   "Add SPEC to `cmdr-spec-table', replacing a same-named spec in place."
+  (let ((old (seq-find (lambda (s) (eq (cmdr-spec-name s) (cmdr-spec-name spec))) cmdr-spec-table)))
+    (when old
+      (let ((inst-hook (cmdr-spec--install-hook-name (cmdr-spec-name old)))
+            (act-hook (cmdr-spec--activate-hook-name (cmdr-spec-name old))))
+        (dolist (fn (ignore-errors (cmdr-spec-install-hook old)))
+          (remove-hook inst-hook fn))
+        (dolist (fn (ignore-errors (cmdr-spec-activate-hook old)))
+          (remove-hook act-hook fn)))))
   (setq cmdr-spec-table
         (if (seq-find (lambda (s) (eq (cmdr-spec-name s) (cmdr-spec-name spec))) cmdr-spec-table)
             (seq-map (lambda (s)
@@ -280,6 +367,31 @@ Other variables are set via `set-default'."
           cmdr-spec--saved-settings)
   (setq cmdr-spec--saved-settings nil))
 
+(defun cmdr-spec--resolve-feature (spec)
+  "Resolve the feature symbol for SPEC, or nil."
+  (or (ignore-errors (cmdr-spec-feature spec))
+      (let ((probe (cmdr-spec-probe spec)))
+        (cond
+         ((stringp probe) (intern probe))
+         ((and (consp probe) (stringp (car probe))) (intern (car probe)))
+         ((and (symbolp probe) (locate-library (symbol-name probe))) probe)
+         ((locate-library (symbol-name (cmdr-spec-name spec))) (cmdr-spec-name spec))
+         (t (cmdr-spec-name spec))))))
+
+(defvar cmdr-spec--activate-scheduled nil
+  "List of spec names that have scheduled an activate hook on a feature.")
+
+(defun cmdr-spec--schedule-activate-hook (spec)
+  "Schedule or run the activate hook for SPEC."
+  (let* ((name (cmdr-spec-name spec))
+         (feature (cmdr-spec--resolve-feature spec))
+         (act-hook (cmdr-spec--activate-hook-name name)))
+    (when (and feature (not (eq feature 'none)))
+      (unless (memq name cmdr-spec--activate-scheduled)
+        (push name cmdr-spec--activate-scheduled)
+        (eval-after-load feature
+          `(run-hooks ',act-hook))))))
+
 ;;;###autoload
 (defun cmdr-spec-install (name)
   "Install the spec called NAME into `cmdr-mode-map', ignoring its probe.
@@ -347,6 +459,8 @@ Installing again is idempotent."
         (cmdr-spec-flush-commands)))
     (when (cmdr-spec-settings spec)
       (cmdr-spec--apply-settings (cmdr-spec-settings spec)))
+    (run-hooks (cmdr-spec--install-hook-name (cmdr-spec-name spec)))
+    (cmdr-spec--schedule-activate-hook spec)
     spec))
 
 ;;;###autoload
