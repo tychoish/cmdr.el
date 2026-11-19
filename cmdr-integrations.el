@@ -324,7 +324,8 @@
   :prefixes (("C-c h" . "docs")
              ("C-x C-b" . "buffer-control"))
   :bindings (("C-c h s" . eglox-describe-symbol-dwim)
-             ("C-x C-b s" . projectile-save-project-buffers-picker)))
+             ("C-x C-b s" . projectile-save-project-buffers-picker)
+             ("M-." . xref-find-definitions)))
 
 (cmdr-register-spec
   :name tools

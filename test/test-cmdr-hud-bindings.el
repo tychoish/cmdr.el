@@ -4,6 +4,7 @@
 (require 'ert)
 (require 'cmdr-defaults)
 (require 'cmdr-ecosystem)
+(require 'cmdr-integrations)
 (require 'cmdr-spec)
 
 (defconst cmdr-test-hud-bindings
