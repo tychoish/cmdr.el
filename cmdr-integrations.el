@@ -339,5 +339,21 @@
              ("C-c t c" . builder-compile)
              ("C-c h q" . kill-eldoc-and-help-buffers)))
 
+(cmdr-register-spec
+  :name emacs
+  :doc "Emacs configuration and package maintenance commands."
+  :commands ((cmdr-spec-command :row 2
+                                :category emacs
+                                :command builder-emacs-conf-recompile-all
+                                :display-name "recompile-emacs-conf"
+                                :description "recompile configuration"
+                                :transient-key "er")
+             (cmdr-spec-command :row 2
+                                :category emacs
+                                :command elpaish-install-upgrade-packages
+                                :display-name "upgrade-emacs-packages"
+                                :description "upgrade packages"
+                                :transient-key "eu")))
+
 (provide 'cmdr-integrations)
 ;;; cmdr-integrations.el ends here
