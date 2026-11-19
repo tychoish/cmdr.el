@@ -34,7 +34,10 @@
     (should (member 'help-mode popper-reference-buffers))
     (should (member 'arch-install-mode popper-reference-buffers))
     (should (member 'agent-shell-queue-item-view-mode popper-reference-buffers))
-    (should (member "\\*compilation\\*" popper-reference-buffers))
+    (should (member 'compilation-mode popper-reference-buffers))
+    (should (member 'messages-buffer-mode popper-reference-buffers))
+    (should (member 'grep-mode popper-reference-buffers))
+    (should (member 'occur-mode popper-reference-buffers))
     (should (eq ediff-window-setup-function 'ediff-setup-windows-plain))
     (should (eq ediff-split-window-function 'split-window-horizontally))))
 

@@ -143,22 +143,33 @@
                                           elpaish-build-mode
                                           elpaish-check-mode
                                           elpaish-status-mode
+                                          elpaish-install-progress-mode
                                           agent-shell-queue-item-view-mode
                                           ert-results-mode
                                           help-mode
                                           message-mode
+                                          messages-buffer-mode
                                           backtrace-mode
                                           deadgrep-mode
+                                          grep-mode
+                                          occur-mode
                                           compilation-mode
-                                          "\\*Messages\\*"
+                                          emacs-lisp-compilation-mode
+                                          native-comp-limple-mode
+                                          xref--xref-buffer-mode
+                                          flymake-diagnostics-buffer-mode
+                                          flymake-project-diagnostics-mode
+                                          magit-process-mode
+                                          profiler-report-mode
+                                          Man-mode
+                                          woman-mode
+                                          jsonrpc-events-mode
+                                          diff-mode
+                                          denote-sequence-hierarchy-mode
                                           "\\*Warnings\\*"
-                                          "\\*Backtrace\\*"
-                                          "\\*Compile-Log\\*"
-                                          "\\*compilation\\*"
-                                          "\\*grep\\*"
-                                          "\\*xref\\*"
-                                          "\\*Flymake diagnostics.*\\*"
-                                          "\\*ert.*\\*"))))
+                                          "\\*Shell Command Output\\*"
+                                          "\\*Async Shell Command\\*"
+                                          "\\*eldoc.*\\*"))))
 
 (cmdr-register-spec
   :name dape
