@@ -32,6 +32,8 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))
     (should (eq popper-display-control nil))
     (should (member 'help-mode popper-reference-buffers))
+    (should (member 'arch-install-mode popper-reference-buffers))
+    (should (member 'agent-shell-queue-item-view-mode popper-reference-buffers))
     (should (member "\\*compilation\\*" popper-reference-buffers))
     (should (eq ediff-window-setup-function 'ediff-setup-windows-plain))
     (should (eq ediff-split-window-function 'split-window-horizontally))))
