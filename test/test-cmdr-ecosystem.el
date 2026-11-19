@@ -12,7 +12,7 @@
 
 (ert-deftest cmdr-ecosystem-test/install-is-idempotent ()
   (let ((cmdr-mode-map (make-sparse-keymap))
-        (names '(clipboard magit smerge docker shell eat anzu dape projectile popper)))
+        (names '(clipboard magit smerge docker shell eat anzu dape projectile popper ediff)))
     (seq-do #'cmdr-spec-install names)
     (let ((snapshot (copy-keymap cmdr-mode-map)))
       (seq-do #'cmdr-spec-install names)
@@ -32,7 +32,9 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c C-M-'") #'popper-toggle-type))
     (should (eq popper-display-control nil))
     (should (member 'help-mode popper-reference-buffers))
-    (should (member "\\*compilation\\*" popper-reference-buffers))))
+    (should (member "\\*compilation\\*" popper-reference-buffers))
+    (should (eq ediff-window-setup-function 'ediff-setup-windows-plain))
+    (should (eq ediff-split-window-function 'split-window-horizontally))))
 
 (defvar magit-mode-map nil)
 

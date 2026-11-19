@@ -162,5 +162,11 @@
   :probe projectile-mode
   :deferred-keymaps (("C-c p" projectile projectile-command-map "projectile")))
 
+(cmdr-register-spec
+  :name ediff
+  :probe ediff
+  :settings ((ediff-window-setup-function . ediff-setup-windows-plain)
+             (ediff-split-window-function . split-window-horizontally)))
+
 (provide 'cmdr-ecosystem)
 ;;; cmdr-ecosystem.el ends here
