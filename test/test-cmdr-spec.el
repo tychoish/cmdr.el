@@ -414,6 +414,105 @@
                           :activate-hook #'cmdr-spec-test--inst-fn)
       (cmdr-spec-install 'no-eval))))
 
+(defvar cmdr-spec-nested-first-activate-hook nil)
+(defvar cmdr-spec-nested-second-activate-hook nil)
+(defvar cmdr-spec-test--nested-file nil)
+(defvar cmdr-spec-test--nested-count 0)
+(defvar cmdr-spec-test--nested-second-count 0)
+
+(defun cmdr-spec-test--nested-activate ()
+  "Load another feature while the first spec is activating."
+  (cl-incf cmdr-spec-test--nested-count)
+  (load cmdr-spec-test--nested-file nil t))
+
+(defun cmdr-spec-test--nested-second-activate ()
+  "Record activation of the feature loaded by another activation hook."
+  (cl-incf cmdr-spec-test--nested-second-count))
+
+(ert-deftest cmdr-spec-test/keymap-appears-after-feature ()
+  "Retry a missing map after its already-provided feature loads another file."
+  (cmdr-spec-test--with-table
+    (let ((features (cons 'cmdr-spec-test-map-package (copy-sequence features)))
+          (test-cmdr-spec--deferred-map nil)
+          (file (make-temp-file "cmdr-map-" nil ".el")))
+      (unwind-protect
+          (progn
+            (with-temp-file file
+              (insert ";;; -*- lexical-binding: t; -*-\n"
+                      "(setq test-cmdr-spec--deferred-map (make-sparse-keymap))\n"))
+            (cmdr-register-spec :name late-map :feature none
+              :keymap-bindings ((cmdr-spec-test-map-package test-cmdr-spec--deferred-map
+                                 ("d" . ignore))))
+            (cmdr-spec-install 'late-map)
+            (should (gethash 'late-map cmdr-spec--pending-layouts))
+            (should (memq #'cmdr-spec--after-load after-load-functions))
+            (load file nil t)
+            (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") #'ignore))
+            (should-not (gethash 'late-map cmdr-spec--pending-layouts))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file file)))))
+
+(ert-deftest cmdr-spec-test/real-transient-layout-appears-and-reloads-once ()
+  "Insert into a late real transient layout and do not duplicate on reload."
+  (cmdr-spec-test--with-table
+    (let ((features (cons 'cmdr-spec-test-layout-package (copy-sequence features)))
+          (file (make-temp-file "cmdr-layout-" nil ".el"))
+          (prefix 'cmdr-spec-test--late-prefix))
+      (unwind-protect
+          (progn
+            (with-temp-file file
+              (insert ";;; -*- lexical-binding: t; -*-\n"
+                      "(transient-define-prefix cmdr-spec-test--late-prefix ()\n"
+                      "  [(\"a\" \"alpha\" ignore)])\n"))
+            (cmdr-register-spec :name late-layout :feature none
+              :transient-suffixes ((cmdr-spec-test-layout-package
+                                    cmdr-spec-test--late-prefix (-1 0)
+                                    ("x" "extra" ignore))))
+            (cmdr-spec-install 'late-layout)
+            (should (gethash 'late-layout cmdr-spec--pending-layouts))
+            (load file nil t)
+            (should (transient-get-suffix prefix "x"))
+            (should-not (gethash 'late-layout cmdr-spec--pending-layouts))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions))
+            (let ((layout (format "%S" (get prefix 'transient--layout))))
+              (cmdr-spec-reload 'late-layout)
+              (cmdr-spec-reload 'late-layout)
+              (should (transient-get-suffix prefix "x"))
+              (should (equal layout (format "%S" (get prefix 'transient--layout))))))
+        (delete-file file)
+        (setplist prefix nil)
+        (when (fboundp prefix) (fmakunbound prefix))))))
+
+(ert-deftest cmdr-spec-test/nested-feature-load-during-activation ()
+  "Nested library loads activate each waiting spec exactly once."
+  (cmdr-spec-test--with-table
+    (let ((features (copy-sequence features))
+          (cmdr-spec-test--nested-count 0)
+          (cmdr-spec-test--nested-second-count 0)
+          (cmdr-spec-nested-first-activate-hook nil)
+          (cmdr-spec-nested-second-activate-hook nil)
+          (first (make-temp-file "cmdr-first-" nil ".el"))
+          (cmdr-spec-test--nested-file (make-temp-file "cmdr-second-" nil ".el")))
+      (unwind-protect
+          (progn
+            (with-temp-file first
+              (insert ";;; -*- lexical-binding: t; -*-\n(provide 'cmdr-spec-test-first)\n"))
+            (with-temp-file cmdr-spec-test--nested-file
+              (insert ";;; -*- lexical-binding: t; -*-\n(provide 'cmdr-spec-test-second)\n"))
+            (cmdr-register-spec :name nested-first :feature cmdr-spec-test-first
+                                :activate-hook #'cmdr-spec-test--nested-activate)
+            (cmdr-register-spec :name nested-second :feature cmdr-spec-test-second
+                                :activate-hook #'cmdr-spec-test--nested-second-activate)
+            (cmdr-spec-install 'nested-first)
+            (cmdr-spec-install 'nested-second)
+            (load first nil t)
+            (should (= cmdr-spec-test--nested-count 1))
+            (should (= cmdr-spec-test--nested-second-count 1))
+            (should (= (hash-table-count cmdr-spec--pending-by-feature) 0))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file first)
+        (delete-file cmdr-spec-test--nested-file)))))
+
 (ert-deftest cmdr-spec-test/hook-rejects-anonymous-function ()
   "Reject anonymous lambdas as hook arguments in cmdr-register-spec."
   (should-error
