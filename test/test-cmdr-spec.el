@@ -28,7 +28,7 @@
          (cmdr-spec--activated (make-hash-table :test #'eq))
          (cmdr-spec--installed (make-hash-table :test #'eq))
          (cmdr-spec--activating (make-hash-table :test #'eq))
-         (cmdr-spec--pending-layouts (make-hash-table :test #'eq))
+         (cmdr-spec--pending-resources (make-hash-table :test #'eq))
          (after-load-functions (copy-sequence after-load-functions))
          (cmdr-mode-map (make-sparse-keymap)))
      ,@body))
@@ -263,11 +263,11 @@
             (cmdr-register-spec :name test-ts :feature none
               :transient-suffixes ((test-cmdr-spec--prefix (-1) ("x" "ext" ignore))))
             (cmdr-spec-install 'test-ts)
-            (should (gethash 'test-ts cmdr-spec--pending-layouts))
+            (should (gethash 'test-ts cmdr-spec--pending-resources))
             (put 'test-cmdr-spec--prefix 'transient--layout t)
             (cmdr-spec--after-load "test")
             (should (equal inserted '((test-cmdr-spec--prefix (-1) ("x" "ext" ignore)))))
-            (should-not (gethash 'test-ts cmdr-spec--pending-layouts)))
+            (should-not (gethash 'test-ts cmdr-spec--pending-resources)))
         (put 'test-cmdr-spec--prefix 'transient--layout nil)))))
 
 (defvar cmdr-spec-test--scalar nil)
@@ -444,11 +444,11 @@
               :keymap-bindings ((cmdr-spec-test-map-package test-cmdr-spec--deferred-map
                                  ("d" . ignore))))
             (cmdr-spec-install 'late-map)
-            (should (gethash 'late-map cmdr-spec--pending-layouts))
+            (should (gethash 'late-map cmdr-spec--pending-resources))
             (should (memq #'cmdr-spec--after-load after-load-functions))
             (load file nil t)
             (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") #'ignore))
-            (should-not (gethash 'late-map cmdr-spec--pending-layouts))
+            (should-not (gethash 'late-map cmdr-spec--pending-resources))
             (should-not (memq #'cmdr-spec--after-load after-load-functions)))
         (delete-file file)))))
 
@@ -469,10 +469,10 @@
                                     cmdr-spec-test--late-prefix (-1 0)
                                     ("x" "extra" ignore))))
             (cmdr-spec-install 'late-layout)
-            (should (gethash 'late-layout cmdr-spec--pending-layouts))
+            (should (gethash 'late-layout cmdr-spec--pending-resources))
             (load file nil t)
             (should (transient-get-suffix prefix "x"))
-            (should-not (gethash 'late-layout cmdr-spec--pending-layouts))
+            (should-not (gethash 'late-layout cmdr-spec--pending-resources))
             (should-not (memq #'cmdr-spec--after-load after-load-functions))
             (let ((layout (format "%S" (get prefix 'transient--layout))))
               (cmdr-spec-reload 'late-layout)
@@ -512,6 +512,138 @@
             (should-not (memq #'cmdr-spec--after-load after-load-functions)))
         (delete-file first)
         (delete-file cmdr-spec-test--nested-file)))))
+
+(ert-deftest cmdr-spec-test/keymap-feature-loads-during-install ()
+  "A feature loaded during installation must not lose its pending map."
+  (cmdr-spec-test--with-table
+    (let ((features (delq 'cmdr-spec-test-nested-map (copy-sequence features)))
+          (test-cmdr-spec--deferred-map nil)
+          (file (make-temp-file "cmdr-nested-map-" nil ".el"))
+          loaded)
+      (unwind-protect
+          (progn
+            (with-temp-file file
+              (insert ";;; -*- lexical-binding: t; -*-\n"
+                      "(setq test-cmdr-spec--deferred-map (make-sparse-keymap))\n"
+                      "(provide 'cmdr-spec-test-nested-map)\n"))
+            (cmdr-register-spec :name nested-map :feature none
+              :keymap-bindings ((cmdr-spec-test-nested-map test-cmdr-spec--deferred-map
+                                 ("d" . ignore))))
+            (cl-letf (((symbol-function 'cmdr-spec--activate-transient-suffixes)
+                       (lambda (_spec)
+                         (unless loaded (setq loaded t) (load file nil t)))))
+              (cmdr-spec-install 'nested-map))
+            (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") #'ignore))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file file)))))
+
+(ert-deftest cmdr-spec-test/unknown-keymap-option-rejected ()
+  "Invalid keymap options should not silently discard configuration."
+  (cmdr-spec-test--with-table
+    (should-error
+     (cmdr-register-spec :name invalid-options
+       :keymap-bindings ((ert test-cmdr-spec--deferred-map :bogus something
+                              ("d" . ignore))))
+     :type 'user-error)))
+
+(defvar cmdr-spec-test--late-map-file nil)
+(defvar cmdr-spec-test--late-map-count 0)
+
+(defun cmdr-spec-test--load-late-map ()
+  "Load a file which defines a pending keymap."
+  (cl-incf cmdr-spec-test--late-map-count)
+  (load cmdr-spec-test--late-map-file nil t))
+
+(ert-deftest cmdr-spec-test/nested-load-rechecks-earlier-missing-resource ()
+  "A nested load can satisfy a resource already checked in the same pass."
+  (cmdr-spec-test--with-table
+    (let ((features (cons 'cmdr-spec-test-ready-map (copy-sequence features)))
+          (test-cmdr-spec--deferred-map nil)
+          (cmdr-spec-test--late-map-count 0)
+          (cmdr-spec-test--late-map-file (make-temp-file "cmdr-late-map-" nil ".el"))
+          (feature-file (make-temp-file "cmdr-shared-feature-" nil ".el")))
+      (unwind-protect
+          (progn
+            (with-temp-file cmdr-spec-test--late-map-file
+              (insert ";;; -*- lexical-binding: t; -*-\n"
+                      "(setq test-cmdr-spec--deferred-map (make-sparse-keymap))\n"))
+            (with-temp-file feature-file
+              (insert ";;; -*- lexical-binding: t; -*-\n"
+                      "(provide 'cmdr-spec-test-shared-feature)\n"))
+            (cmdr-register-spec :name nested-resource-b
+              :feature cmdr-spec-test-shared-feature
+              :activate-hook #'cmdr-spec-test--load-late-map)
+            (cmdr-register-spec :name nested-resource-a
+              :feature cmdr-spec-test-shared-feature
+              :activate-hook #'ignore
+              :keymap-bindings ((cmdr-spec-test-ready-map test-cmdr-spec--deferred-map
+                                 ("d" . ignore))))
+            (cmdr-spec-install 'nested-resource-b)
+            (cmdr-spec-install 'nested-resource-a)
+            (load feature-file nil t)
+            (should (= cmdr-spec-test--late-map-count 1))
+            (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") #'ignore))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file cmdr-spec-test--late-map-file)
+        (delete-file feature-file)))))
+
+(ert-deftest cmdr-spec-test/reload-picker-annotates-specs ()
+  "The reload picker shows descriptions and can select all installed specs."
+  (cmdr-spec-test--with-table
+    (let (choices)
+      (cmdr-register-spec :name picker :doc "Useful description" :feature ert)
+      (cmdr-spec-install 'picker)
+      (cl-letf (((symbol-function 'annotated-completing-read)
+                 (lambda (table &rest _options)
+                   (setq choices table)
+                   "All installed specs")))
+        (call-interactively #'cmdr-spec-reload))
+      (should (equal (cdr (assoc "picker" choices)) "Useful description"))
+      (should (assoc "All installed specs" choices)))))
+
+(defvar cmdr-spec-test--failure-count 0)
+(defvar cmdr-spec-test--successful-count 0)
+
+(defun cmdr-spec-test--fail-once ()
+  "Fail on the first activation and succeed on the next attempt."
+  (cl-incf cmdr-spec-test--failure-count)
+  (when (= cmdr-spec-test--failure-count 1)
+    (error "Expected activation failure")))
+
+(defun cmdr-spec-test--succeed ()
+  "Record a successful activation."
+  (cl-incf cmdr-spec-test--successful-count))
+
+(ert-deftest cmdr-spec-test/failed-activation-is-isolated-and-retried ()
+  "A failing activation does not block other specs and can recover later."
+  (cmdr-spec-test--with-table
+    (let ((features (copy-sequence features))
+          (cmdr-spec-test--failure-count 0)
+          (cmdr-spec-test--successful-count 0)
+          (feature-file (make-temp-file "cmdr-failure-feature-" nil ".el"))
+          (retry-file (make-temp-file "cmdr-retry-" nil ".el")))
+      (unwind-protect
+          (progn
+            (with-temp-file feature-file
+              (insert ";;; -*- lexical-binding: t; -*-\n(provide 'cmdr-spec-test-failure-feature)\n"))
+            (with-temp-file retry-file
+              (insert ";;; -*- lexical-binding: t; -*-\n"))
+            (cmdr-register-spec :name failure-test :feature cmdr-spec-test-failure-feature
+                                :activate-hook #'cmdr-spec-test--fail-once)
+            (cmdr-register-spec :name success-test :feature cmdr-spec-test-failure-feature
+                                :activate-hook #'cmdr-spec-test--succeed)
+            (cmdr-spec-install 'failure-test)
+            (cmdr-spec-install 'success-test)
+            (load feature-file nil t)
+            (should (= cmdr-spec-test--failure-count 1))
+            (should (= cmdr-spec-test--successful-count 1))
+            (should (gethash 'failure-test cmdr-spec--pending-resources))
+            (load retry-file nil t)
+            (should (= cmdr-spec-test--failure-count 2))
+            (should (= cmdr-spec-test--successful-count 1))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file feature-file)
+        (delete-file retry-file)))))
 
 (ert-deftest cmdr-spec-test/hook-rejects-anonymous-function ()
   "Reject anonymous lambdas as hook arguments in cmdr-register-spec."
