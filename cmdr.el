@@ -388,7 +388,6 @@ Unavailable commands are listed, marked as such, and refuse to run."
             (cmdr--invoke (cddr candidate) origin prefix)
           (user-error "No visible cmdr command named %S" label))))))
 
-(cmdr-spec-flush-commands)
 
 (provide 'cmdr)
 ;;; cmdr.el ends here

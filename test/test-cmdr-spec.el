@@ -24,7 +24,10 @@
          (cmdr-disabled-specs nil)
          (cmdr-opt-in-specs nil)
          (cmdr-spec--saved-settings nil)
-         (cmdr-spec--activate-scheduled nil)
+         (cmdr-spec--pending-by-feature (make-hash-table :test #'eq))
+         (cmdr-spec--activated (make-hash-table :test #'eq))
+         (cmdr-spec--pending-layouts (make-hash-table :test #'eq))
+         (after-load-functions (copy-sequence after-load-functions))
          (cmdr-mode-map (make-sparse-keymap)))
      ,@body))
 
@@ -234,81 +237,36 @@
 (defvar test-cmdr-spec--deferred-hook nil)
 (defvar test-cmdr-spec--deferred-map nil)
 
-(ert-deftest cmdr-spec-test/keymap-bindings-deferred-via-explicit-hook ()
+(ert-deftest cmdr-spec-test/keymap-bindings-deferred-until-feature ()
   (cmdr-spec-test--with-table
-    (setq test-cmdr-spec--deferred-hook nil
-          test-cmdr-spec--deferred-map nil)
-    (cmdr-register-spec
-      :name ext-deferred
-      :probe "ert"
-      :keymap-bindings
-      ((test-pkg test-cmdr-spec--deferred-map
-        :hook test-cmdr-spec--deferred-hook
-        ("d" . 'ignore))))
-    (cmdr-spec-install 'ext-deferred)
-    ;; Map not defined yet, hook should be waiting
-    (should test-cmdr-spec--deferred-hook)
-    ;; Package/mode activates and initializes the map
-    (setq test-cmdr-spec--deferred-map (make-sparse-keymap))
-    (run-hooks 'test-cmdr-spec--deferred-hook)
-    ;; Key should now be bound
-    (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") 'ignore))
-    ;; One-shot hook should have removed itself
-    (should-not test-cmdr-spec--deferred-hook)))
+    (let ((features (delq 'test-pkg (copy-sequence features)))
+          (test-cmdr-spec--deferred-map nil))
+      (cmdr-register-spec :name deferred-map :feature none
+        :keymap-bindings ((test-pkg test-cmdr-spec--deferred-map
+                           ("d" . 'ignore))))
+      (cmdr-spec-install 'deferred-map)
+      (should (memq #'cmdr-spec--after-load after-load-functions))
+      (setq test-cmdr-spec--deferred-map (make-sparse-keymap))
+      (provide 'test-pkg)
+      (cmdr-spec--after-load "test-pkg")
+      (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") 'ignore))
+      (should-not (memq #'cmdr-spec--after-load after-load-functions)))))
 
-(defvar test-cmdr-sample-mode-hook nil)
-(defvar test-cmdr-sample-mode-map nil)
-
-(ert-deftest cmdr-spec-test/keymap-bindings-deferred-via-derived-mode-hook ()
+(ert-deftest cmdr-spec-test/transient-suffixes-deferred ()
   (cmdr-spec-test--with-table
-    (setq test-cmdr-sample-mode-hook nil
-          test-cmdr-sample-mode-map nil)
-    (cmdr-register-spec
-      :name ext-derived-hook
-      :probe "ert"
-      :keymap-bindings
-      ((test-pkg test-cmdr-sample-mode-map
-        ("m" . 'ignore))))
-    (cmdr-spec-install 'ext-derived-hook)
-    ;; Map not defined yet, derived test-cmdr-sample-mode-hook should be waiting
-    (should test-cmdr-sample-mode-hook)
-    ;; Package/mode activates
-    (setq test-cmdr-sample-mode-map (make-sparse-keymap))
-    (run-hooks 'test-cmdr-sample-mode-hook)
-    ;; Key should now be bound
-    (should (eq (keymap-lookup test-cmdr-sample-mode-map "m") 'ignore))
-    ;; One-shot hook should have removed itself
-    (should-not test-cmdr-sample-mode-hook)))
-
-(ert-deftest cmdr-spec-test/transient-suffixes-install-immediate-and-deferred ()
-  (cmdr-spec-test--with-table
-    (let ((inserted nil)
-          (cmdr-spec--pending-transient-suffixes nil))
-      (put 'test-cmdr-spec--prefix 'transient--layout t)
+    (let ((inserted nil))
       (unwind-protect
           (cl-letf (((symbol-function 'cmdr-transient-insert-suffix-once)
-                     (lambda (prefix loc suffix)
-                       (push (list prefix loc suffix) inserted))))
-            (cmdr-register-spec
-              :name test-ts
-              :probe "ert"
-              :transient-suffixes
-              ((test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore))
-               (test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore))))
+                     (lambda (prefix loc suffix) (push (list prefix loc suffix) inserted))))
+            (cmdr-register-spec :name test-ts :feature none
+              :transient-suffixes ((test-cmdr-spec--prefix (-1) ("x" "ext" ignore))))
             (cmdr-spec-install 'test-ts)
-            (should (equal inserted
-                           '((test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore)))))
-            (should (equal cmdr-spec--pending-transient-suffixes
-                           '((test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore)))))
-            (put 'test-cmdr-spec--deferred-prefix 'transient--layout t)
-            (cmdr-spec--flush-transient-suffixes)
-            (should-not cmdr-spec--pending-transient-suffixes)
-            (should (equal inserted
-                           '((test-cmdr-spec--deferred-prefix (-1) ("y" "def" ignore))
-                             (test-cmdr-spec--prefix (-1 0) ("x" "ext" ignore))))))
-        (put 'test-cmdr-spec--prefix 'transient--layout nil)
-        (put 'test-cmdr-spec--deferred-prefix 'transient--layout nil)
-        (remove-hook 'after-load-functions #'cmdr-spec--flush-transient-suffixes)))))
+            (should (gethash 'test-ts cmdr-spec--pending-layouts))
+            (put 'test-cmdr-spec--prefix 'transient--layout t)
+            (cmdr-spec--after-load "test")
+            (should (equal inserted '((test-cmdr-spec--prefix (-1) ("x" "ext" ignore)))))
+            (should-not (gethash 'test-ts cmdr-spec--pending-layouts)))
+        (put 'test-cmdr-spec--prefix 'transient--layout nil)))))
 
 (defvar cmdr-spec-test--scalar nil)
 (defvar cmdr-spec-test--collection nil)
