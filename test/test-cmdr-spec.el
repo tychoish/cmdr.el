@@ -384,17 +384,22 @@
     ;; 2. Deferred feature loaded later
     (setq cmdr-spec-test--deferred-ran nil)
     (setq features (delq 'cmdr-test-deferred-feature features))
-    (unwind-protect
+    (let ((after-load-alist (copy-tree after-load-alist))
+          (feature-file (make-temp-file "cmdr-deferred-" nil ".el")))
+      (unwind-protect
         (progn
+          (with-temp-file feature-file
+            (insert "(provide 'cmdr-test-deferred-feature)\n"))
           (cmdr-register-spec
             :name test-defer
             :feature cmdr-test-deferred-feature
             :activate-hook #'cmdr-spec-test--deferred-fn)
           (cmdr-spec-install 'test-defer)
           (should-not cmdr-spec-test--deferred-ran)
-          (provide 'cmdr-test-deferred-feature)
+          (load feature-file nil t)
           (should cmdr-spec-test--deferred-ran))
-      (setq features (delq 'cmdr-test-deferred-feature features)))))
+        (setq features (delq 'cmdr-test-deferred-feature features))
+        (delete-file feature-file)))))
 
 (ert-deftest cmdr-spec-test/hook-rejects-anonymous-function ()
   "Reject anonymous lambdas as hook arguments in cmdr-register-spec."
