@@ -165,8 +165,9 @@ SPEC may include :hook to specify custom activation hook(s).
 TRANSIENT-SUFFIXES is a list of (PACKAGE PREFIX LOC SUFFIX) or
 (PREFIX LOC SUFFIX) entries passed to `cmdr-transient-insert-suffix-once'.
 SETTINGS is an alist of (SYMBOL . VALUE) settings applied upon installation.
-INSTALL-HOOK is a function, lambda, or list of functions run when the spec is installed.
-ACTIVATE-HOOK is a function, lambda, or list of functions run when FEATURE is loaded."
+INSTALL-HOOK is a function, lambda, or list of functions run when the
+spec is installed.  ACTIVATE-HOOK has the same form and runs when
+FEATURE is loaded."
   (declare (indent 0))
   (unless (and name (symbolp name))
     (user-error "cmdr-register-spec requires a symbol :name, got %S" name))
