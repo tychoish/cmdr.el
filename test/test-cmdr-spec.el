@@ -26,6 +26,8 @@
          (cmdr-spec--saved-settings nil)
          (cmdr-spec--pending-by-feature (make-hash-table :test #'eq))
          (cmdr-spec--activated (make-hash-table :test #'eq))
+         (cmdr-spec--installed (make-hash-table :test #'eq))
+         (cmdr-spec--activating (make-hash-table :test #'eq))
          (cmdr-spec--pending-layouts (make-hash-table :test #'eq))
          (after-load-functions (copy-sequence after-load-functions))
          (cmdr-mode-map (make-sparse-keymap)))
@@ -358,6 +360,59 @@
           (should cmdr-spec-test--deferred-ran))
         (setq features (delq 'cmdr-test-deferred-feature features))
         (delete-file feature-file)))))
+
+(ert-deftest cmdr-spec-test/reload-and-redefine-activation ()
+  (cmdr-spec-test--with-table
+    (setq cmdr-spec-test--inst-count 0)
+    (cmdr-register-spec :name repeat :feature ert
+                        :activate-hook #'cmdr-spec-test--inst-fn)
+    (cmdr-spec-install 'repeat)
+    (cmdr-spec-install 'repeat)
+    (should (= cmdr-spec-test--inst-count 1))
+    (cmdr-spec-reload 'repeat)
+    (should (= cmdr-spec-test--inst-count 2))
+    (cmdr-register-spec :name repeat :feature ert
+                        :activate-hook #'cmdr-spec-test--inst-fn)
+    (cmdr-spec-install 'repeat)
+    (should (= cmdr-spec-test--inst-count 3))))
+
+(ert-deftest cmdr-spec-test/commands-flush-when-cmdr-loads ()
+  (cmdr-spec-test--with-table
+    (let ((features (delq 'cmdr (copy-sequence features))) registered)
+      (cl-letf (((symbol-function 'cmdr-register-command)
+                 (lambda (&rest args) (push args registered))))
+        (cmdr-register-spec :name commands :feature none
+          :commands ((cmdr-spec-command :category test :command ignore)))
+        (cmdr-spec-install 'commands)
+        (should (memq #'cmdr-spec--after-load after-load-functions))
+        (provide 'cmdr)
+        (cmdr-spec--after-load "cmdr")
+        (should (= (length registered) 1))
+        (should-not cmdr-spec--pending)
+        (should-not (memq #'cmdr-spec--after-load after-load-functions))))))
+
+(ert-deftest cmdr-spec-test/featureless-spec-does-not-leave-dispatcher ()
+  (cmdr-spec-test--with-table
+    (cmdr-register-spec :name no-library :bindings (("C-c z" . ignore)))
+    (cmdr-spec-install 'no-library)
+    (should-not (memq #'cmdr-spec--after-load after-load-functions))))
+
+(ert-deftest cmdr-spec-test/replacement-clears-pending-dispatcher ()
+  (cmdr-spec-test--with-table
+    (cmdr-register-spec :name replaced :feature never-loaded
+                        :activate-hook #'cmdr-spec-test--inst-fn)
+    (cmdr-spec-install 'replaced)
+    (should (memq #'cmdr-spec--after-load after-load-functions))
+    (cmdr-register-spec :name replaced :feature none)
+    (should-not (memq #'cmdr-spec--after-load after-load-functions))))
+
+(ert-deftest cmdr-spec-test/install-does-not-use-eval-after-load ()
+  (cmdr-spec-test--with-table
+    (cl-letf (((symbol-function 'eval-after-load)
+               (lambda (&rest _) (ert-fail "Unexpected eval-after-load"))))
+      (cmdr-register-spec :name no-eval :feature never-loaded
+                          :activate-hook #'cmdr-spec-test--inst-fn)
+      (cmdr-spec-install 'no-eval))))
 
 (ert-deftest cmdr-spec-test/hook-rejects-anonymous-function ()
   "Reject anonymous lambdas as hook arguments in cmdr-register-spec."

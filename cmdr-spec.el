@@ -72,6 +72,15 @@ Mirrors the arguments of `cmdr-register-command'."
 (defvar cmdr-spec--pending-by-feature (make-hash-table :test #'eq)
   "Map features to names of specs waiting for them.")
 
+(defvar cmdr-spec--dispatching nil
+  "Non-nil while the after-load dispatcher is running.")
+
+(defvar cmdr-spec--activating (make-hash-table :test #'eq)
+  "Names of specs currently running activation hooks.")
+
+(defvar cmdr-spec--installed (make-hash-table :test #'eq)
+  "Names of specs installed in this session.")
+
 (defvar cmdr-spec--activated (make-hash-table :test #'eq)
   "Names of specs whose activation hooks have run.")
 
@@ -220,6 +229,9 @@ FEATURE is loaded."
   (setq cmdr-spec--pending
         (seq-remove (lambda (old) (eq (cmdr-spec-name old) (cmdr-spec-name spec)))
                     cmdr-spec--pending))
+  (when (and (zerop (hash-table-count cmdr-spec--pending-by-feature))
+             (zerop (hash-table-count cmdr-spec--pending-layouts)))
+    (remove-hook 'after-load-functions #'cmdr-spec--after-load))
   (setq cmdr-spec-table
         (if (seq-find (lambda (s) (eq (cmdr-spec-name s) (cmdr-spec-name spec))) cmdr-spec-table)
             (seq-map (lambda (s)
@@ -321,7 +333,8 @@ Return non-nil if applied, nil otherwise."
 
 (defun cmdr-spec--activate-keymap-bindings (spec)
   "Apply available external keymaps in SPEC; defer the rest by feature."
-  (dolist (entry (cmdr-spec-keymap-bindings spec))
+  (let (missing)
+   (dolist (entry (cmdr-spec-keymap-bindings spec))
     (pcase-let* ((`(,feature ,keymap . ,rest) entry)
                  (prefixes (plist-get rest :prefixes))
                  (bindings (if (keywordp (car-safe rest))
@@ -334,18 +347,25 @@ Return non-nil if applied, nil otherwise."
                                      (nreverse result)))
                              rest)))
       (unless (cmdr-spec--apply-keymap-bindings keymap prefixes bindings)
-        (unless (featurep feature)
-          (cmdr-spec--queue-feature feature (cmdr-spec-name spec)))))))
+        (if (featurep feature)
+            (push entry missing)
+          (cmdr-spec--queue-feature feature (cmdr-spec-name spec))))))
+   missing))
 
 (defun cmdr-spec--activate-transient-suffixes (spec)
   "Apply transient suffixes in SPEC or retain them until their layout exists."
   (let ((name (cmdr-spec-name spec)) pending)
     (dolist (entry (cmdr-spec-transient-suffixes spec))
-      (pcase-let* ((`(,prefix ,loc ,suffix)
-                    (if (= (length entry) 4) (cdr entry) entry)))
-        (if (and (get prefix 'transient--layout) (featurep 'cmdr))
-            (cmdr-transient-insert-suffix-once prefix loc suffix)
-          (push entry pending))))
+      (pcase-let* ((feature (and (= (length entry) 4) (car entry)))
+                   (`(,prefix ,loc ,suffix) (if feature (cdr entry) entry)))
+        (cond
+         ((and feature (not (featurep feature)))
+          (cmdr-spec--queue-feature feature name))
+         ((and (get prefix 'transient--layout) (featurep 'cmdr))
+          (cmdr-transient-insert-suffix-once prefix loc suffix))
+         (t (push entry pending)))))
+    (when (and pending (not (featurep 'cmdr)))
+      (cmdr-spec--queue-feature 'cmdr name))
     (if pending
         (progn
           (puthash name (nreverse pending) cmdr-spec--pending-layouts)
@@ -409,18 +429,26 @@ Other variables are set via `set-default'."
 
 (defun cmdr-spec--activate-spec (name &optional force)
   "Apply resources and activate NAME once, or again when FORCE is non-nil."
-  (let* ((spec (cmdr-spec-get name))
-         (feature (cmdr-spec--resolve-feature spec)))
-    (cmdr-spec--activate-keymap-bindings spec)
-    (cmdr-spec--activate-transient-suffixes spec)
-    (when (and (not (eq feature 'none)) (featurep feature)
-               (or force (not (gethash name cmdr-spec--activated))))
-      (run-hooks (cmdr-spec--activate-hook-name name))
-      (puthash name t cmdr-spec--activated))))
+  (unless (gethash name cmdr-spec--activating)
+    (puthash name t cmdr-spec--activating)
+    (unwind-protect
+        (let* ((spec (cmdr-spec-get name))
+               (feature (cmdr-spec--resolve-feature spec)))
+          (let ((missing (cmdr-spec--activate-keymap-bindings spec)))
+            (cmdr-spec--activate-transient-suffixes spec)
+            (when missing
+              (puthash name t cmdr-spec--pending-layouts)
+              (add-hook 'after-load-functions #'cmdr-spec--after-load)))
+          (when (and (not (eq feature 'none)) (featurep feature)
+                     (or force (not (gethash name cmdr-spec--activated))))
+            (run-hooks (cmdr-spec--activate-hook-name name))
+            (puthash name t cmdr-spec--activated)))
+      (remhash name cmdr-spec--activating))))
 
 (defun cmdr-spec--after-load (_file)
   "Dispatch pending spec work after a library loads."
-  (let (ready names layouts)
+  (unless cmdr-spec--dispatching
+   (let ((cmdr-spec--dispatching t) ready names layouts)
     (maphash (lambda (feature specs)
                (when (featurep feature)
                  (push feature ready)
@@ -434,10 +462,14 @@ Other variables are set via `set-default'."
     (dolist (name (delete-dups (append names layouts)))
       (condition-case err
           (cmdr-spec--activate-spec name)
-        (error (cmdr-spec--record-failure (cmdr-spec-get name) "activation" err))))
+        (error
+         (puthash name t cmdr-spec--pending-layouts)
+         (cmdr-spec--record-failure (cmdr-spec-get name) "activation" err))))
     (when (and (zerop (hash-table-count cmdr-spec--pending-by-feature))
                (zerop (hash-table-count cmdr-spec--pending-layouts)))
-      (remove-hook 'after-load-functions #'cmdr-spec--after-load))))
+      (remove-hook 'after-load-functions #'cmdr-spec--after-load)))
+   (when (seq-some #'featurep (hash-table-keys cmdr-spec--pending-by-feature))
+     (cmdr-spec--after-load nil))))
 
 ;;;###autoload
 (defun cmdr-spec-reload (&optional name)
@@ -447,7 +479,10 @@ Other variables are set via `set-default'."
                                         (mapcar #'cmdr-spec-name cmdr-spec-table)
                                         nil t)))
            (unless (string-empty-p choice) (intern choice)))))
-  (dolist (spec (if name (list (cmdr-spec-get name)) cmdr-spec-table))
+  (dolist (spec (if name (list (cmdr-spec-get name))
+                  (seq-filter (lambda (item)
+                                (gethash (cmdr-spec-name item) cmdr-spec--installed))
+                              cmdr-spec-table)))
     (remhash (cmdr-spec-name spec) cmdr-spec--activated)
     (cmdr-spec-install (cmdr-spec-name spec))))
 
@@ -480,9 +515,11 @@ Installing again is idempotent."
       (cmdr-spec--apply-settings (cmdr-spec-settings spec)))
     (run-hooks (cmdr-spec--install-hook-name (cmdr-spec-name spec)))
     (let ((feature (cmdr-spec--resolve-feature spec)))
-      (unless (or (eq feature 'none) (featurep feature))
+      (when (and (symbol-value (cmdr-spec--activate-hook-name name))
+                 (not (eq feature 'none)) (not (featurep feature)))
         (cmdr-spec--queue-feature feature name)))
     (cmdr-spec--activate-spec name)
+    (puthash name t cmdr-spec--installed)
     spec))
 
 ;;;###autoload
