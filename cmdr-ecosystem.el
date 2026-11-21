@@ -273,8 +273,11 @@
 
 (defun cmdr-diff-review--activate ()
   "Enable `diff-review-magit-mode' when `diff-review' activates."
-  (when (fboundp 'diff-review-magit-mode)
-    (diff-review-magit-mode 1)))
+  (cond
+   ((locate-library "diff-review-magit")
+    (diff-review-magit-mode 1))
+   (t
+    (message "cmdr: diff-review-magit not found; skipping diff-review-magit-mode"))))
 
 (cmdr-register-spec
   :name diff-review
