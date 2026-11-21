@@ -27,6 +27,7 @@
          (cmdr-spec--pending-by-feature (make-hash-table :test #'eq))
          (cmdr-spec--activated (make-hash-table :test #'eq))
          (cmdr-spec--installed (make-hash-table :test #'eq))
+         (cmdr-spec--loaded-autoloads (make-hash-table :test #'eq))
          (cmdr-spec--activating (make-hash-table :test #'eq))
          (cmdr-spec--pending-resources (make-hash-table :test #'eq))
          (after-load-functions (copy-sequence after-load-functions))
@@ -184,6 +185,35 @@
     (should-not (cmdr-spec-test--bound-p "C-c z g"))
     (should (equal (cdr (assq 'gone cmdr-spec-skipped)) "library cmdr-no-such-library not found"))))
 
+(ert-deftest cmdr-spec-test/magit-dash-preserves-activation-feature ()
+  "The magit-dash integration retains its original activation feature."
+  (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'magit-dash))
+              'magit-dash-open)))
+
+(ert-deftest cmdr-spec-test/install-avoids-unnecessary-feature-lookups ()
+  "Installing featureless, same-name, and autoload probes avoids disk scans."
+  (cmdr-spec-test--with-table
+    (unwind-protect
+        (progn
+          (autoload 'cmdr-spec-test-autoload-probe "cmdr-spec-test-autoload-probe")
+          (autoload 'cmdr-spec-test-other-probe "different-library")
+          (cmdr-register-spec :name no-probe)
+          (cmdr-register-spec :name same-probe :probe same-probe)
+          (cmdr-register-spec :name autoload-probe :probe cmdr-spec-test-autoload-probe)
+          (cmdr-register-spec :name fallback-name :probe cmdr-spec-test-other-probe)
+          (cl-letf (((symbol-function 'locate-library)
+                     (lambda (&rest _) (ert-fail "Unexpected library scan"))))
+            (cmdr-spec-install 'no-probe)
+            (cmdr-spec-install 'same-probe)
+            (cmdr-spec-install 'autoload-probe)
+            (cmdr-spec-install 'fallback-name)
+            (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'autoload-probe))
+                        'cmdr-spec-test-autoload-probe))
+            (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'fallback-name))
+                        'fallback-name))))
+      (fmakunbound 'cmdr-spec-test-autoload-probe)
+      (fmakunbound 'cmdr-spec-test-other-probe))))
+
 (ert-deftest cmdr-spec-test/autoloads-library-loaded-when-found ()
   (cmdr-spec-test--with-table
     (let* ((dir (make-temp-file "cmdr-autoloads" t))
@@ -201,6 +231,63 @@
             (cmdr-spec-discover)
             (should cmdr-spec-test-autoloaded)
             (should (cmdr-spec-test--bound-p "C-c z u")))
+        (delete-directory dir t)))))
+
+(defvar cmdr-spec-test-autoload-count 0)
+
+(ert-deftest cmdr-spec-test/autoloads-loaded-once-until-reload ()
+  "Discovery loads autoloads once; an explicit reload loads them again."
+  (cmdr-spec-test--with-table
+    (let* ((dir (make-temp-file "cmdr-autoload-count-" t))
+           (load-path (cons dir load-path))
+           (cmdr-spec-test-autoload-count 0))
+      (unwind-protect
+          (progn
+            (with-temp-file (expand-file-name "cmdr-test-count-autoloads.el" dir)
+              (insert "(setq cmdr-spec-test-autoload-count (1+ cmdr-spec-test-autoload-count))\n"))
+            (cmdr-register-spec :name counted :autoloads "cmdr-test-count-autoloads")
+            (cmdr-spec-discover)
+            (cmdr-spec-discover)
+            (should (= cmdr-spec-test-autoload-count 1))
+            (cmdr-spec-reload 'counted)
+            (should (= cmdr-spec-test-autoload-count 2)))
+        (delete-directory dir t)))))
+
+(ert-deftest cmdr-spec-test/autoloads-load-new-library-on-spec-replacement ()
+  "A replacement spec loads new libraries and reload reloads both."
+  (cmdr-spec-test--with-table
+    (let* ((dir (make-temp-file "cmdr-replace-autoload-" t))
+           (load-path (cons dir load-path))
+           (cmdr-spec-test-autoload-count 0))
+      (unwind-protect
+          (progn
+            (with-temp-file (expand-file-name "cmdr-count-a.el" dir)
+              (insert "(setq cmdr-spec-test-autoload-count (+ cmdr-spec-test-autoload-count 1))\n"))
+            (with-temp-file (expand-file-name "cmdr-count-b.el" dir)
+              (insert "(setq cmdr-spec-test-autoload-count (+ cmdr-spec-test-autoload-count 10))\n"))
+            (cmdr-register-spec :name replaced-auto :autoloads "cmdr-count-a")
+            (cmdr-spec-discover)
+            (cmdr-register-spec :name replaced-auto :autoloads ("cmdr-count-a" "cmdr-count-b"))
+            (cmdr-spec-discover)
+            (should (= cmdr-spec-test-autoload-count 11))
+            (cmdr-spec-reload 'replaced-auto)
+            (should (= cmdr-spec-test-autoload-count 22)))
+        (delete-directory dir t)))))
+
+(ert-deftest cmdr-spec-test/autoloads-retry-after-library-appears ()
+  "A missing autoload library is retried when it becomes available."
+  (cmdr-spec-test--with-table
+    (let* ((dir (make-temp-file "cmdr-late-autoload-" t))
+           (load-path (cons dir load-path))
+           (cmdr-spec-test-autoload-count 0))
+      (unwind-protect
+          (progn
+            (cmdr-register-spec :name late-autoload :autoloads "cmdr-late-autoloads")
+            (cmdr-spec-discover)
+            (with-temp-file (expand-file-name "cmdr-late-autoloads.el" dir)
+              (insert "(setq cmdr-spec-test-autoload-count (1+ cmdr-spec-test-autoload-count))\n"))
+            (cmdr-spec-discover)
+            (should (= cmdr-spec-test-autoload-count 1)))
         (delete-directory dir t)))))
 
 (defvar test-cmdr-spec--ext-map (make-sparse-keymap))
@@ -360,6 +447,33 @@
           (should cmdr-spec-test--deferred-ran))
         (setq features (delq 'cmdr-test-deferred-feature features))
         (delete-file feature-file)))))
+
+(defvar cmdr-spec-late-registration-activate-hook nil)
+(defvar cmdr-spec-test--late-hook-ran nil)
+
+(defun cmdr-spec-test--late-hook ()
+  "Record activation of the late registration test spec."
+  (setq cmdr-spec-test--late-hook-ran t))
+
+(ert-deftest cmdr-spec-test/activation-hook-added-after-install ()
+  "A hook added after installation runs when the feature is loaded."
+  (cmdr-spec-test--with-table
+    (let ((cmdr-spec-late-registration-activate-hook nil)
+          (cmdr-spec-test--late-hook-ran nil)
+          (features (delq 'cmdr-spec-test-late-feature (copy-sequence features)))
+          (file (make-temp-file "cmdr-late-feature-" nil ".el")))
+      (unwind-protect
+          (progn
+            (with-temp-file file
+              (insert "(provide 'cmdr-spec-test-late-feature)\n"))
+            (cmdr-register-spec :name late-registration :feature cmdr-spec-test-late-feature)
+            (cmdr-spec-install 'late-registration)
+            (add-hook 'cmdr-spec-late-registration-activate-hook #'cmdr-spec-test--late-hook)
+            (load file nil t)
+            (should cmdr-spec-test--late-hook-ran)
+            (should (map-empty-p cmdr-spec--pending-by-feature))
+            (should-not (memq #'cmdr-spec--after-load after-load-functions)))
+        (delete-file file)))))
 
 (ert-deftest cmdr-spec-test/reload-and-redefine-activation ()
   (cmdr-spec-test--with-table

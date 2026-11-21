@@ -60,6 +60,7 @@
 
 (cmdr-register-spec
   :name magit-dash
+  :feature magit-dash-open
   :probe magit-dash-open
   :bindings (("C-c t d" . magit-dash-open)
              ("C-c t g" . magit-dash-open)

@@ -78,16 +78,9 @@
 (defvar mu4e-view-mode-hook nil)
 (defvar mu4e-compose-mode-hook nil)
 
-(ert-deftest cmdr-ecosystem-test/mailx-activate-hooks-home-frames ()
-  (let ((mu4e-main-mode-hook nil)
-        (mu4e-headers-mode-hook nil)
-        (mu4e-view-mode-hook nil)
-        (mu4e-compose-mode-hook nil))
-    (cmdr-mailx--setup-home-frames)
-    (should (memq #'cmdr-frame-record-home-frame mu4e-main-mode-hook))
-    (should (memq #'cmdr-frame-record-home-frame mu4e-headers-mode-hook))
-    (should (memq #'cmdr-frame-record-home-frame mu4e-view-mode-hook))
-    (should (memq #'cmdr-frame-record-home-frame mu4e-compose-mode-hook))))
+(ert-deftest cmdr-ecosystem-test/mailx-does-not-register-home-frame-hooks ()
+  "Mailx owns the lifetime of its home-frame hooks."
+  (should-not (cmdr-spec-activate-hook (cmdr-spec-get 'mailx))))
 
 (defvar diff-review-file-command-map nil)
 (defvar diff-review-mode-map nil)

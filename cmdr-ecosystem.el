@@ -196,18 +196,9 @@
 (autoload 'mailx-compose-reply "mailx" nil t)
 (autoload 'cmdr-frame-record-home-frame "cmdr-frame")
 
-(defun cmdr-mailx--setup-home-frames ()
-  "Install `cmdr-frame-record-home-frame' on mu4e mode hooks."
-  (dolist (hook '(mu4e-main-mode-hook
-                  mu4e-headers-mode-hook
-                  mu4e-view-mode-hook
-                  mu4e-compose-mode-hook))
-    (add-hook hook #'cmdr-frame-record-home-frame)))
-
 (cmdr-register-spec
   :name mailx
   :probe mailx-select-account
-  :activate-hook #'cmdr-mailx--setup-home-frames
   :prefixes (("C-c m" . "mail"))
   :bindings (("C-c m a" . mailx-select-account)
              ("C-c m v" . mailx-jump-to-tier)

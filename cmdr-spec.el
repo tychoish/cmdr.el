@@ -85,6 +85,9 @@ Mirrors the arguments of `cmdr-register-command'."
 (defvar cmdr-spec--installed (make-hash-table :test #'eq)
   "Names of specs installed in this session.")
 
+(defvar cmdr-spec--loaded-autoloads (make-hash-table :test #'eq)
+  "Map spec names to autoload libraries successfully loaded for them.")
+
 (defvar cmdr-spec--activated (make-hash-table :test #'eq)
   "Names of specs whose activation hooks have run.")
 
@@ -427,15 +430,21 @@ Other variables are set via `set-default'."
   (setq cmdr-spec--saved-settings nil))
 
 (defun cmdr-spec--resolve-feature (spec)
-  "Resolve the feature symbol for SPEC, or nil."
-  (or (ignore-errors (cmdr-spec-feature spec))
-      (let ((probe (cmdr-spec-probe spec)))
+  "Resolve the feature symbol for SPEC."
+  (or (cmdr-spec-feature spec)
+      (let ((probe (cmdr-spec-probe spec))
+            (name (cmdr-spec-name spec)))
         (cond
          ((stringp probe) (intern probe))
          ((and (consp probe) (stringp (car probe))) (intern (car probe)))
-         ((and (symbolp probe) (locate-library (symbol-name probe))) probe)
-         ((locate-library (symbol-name (cmdr-spec-name spec))) (cmdr-spec-name spec))
-         (t (cmdr-spec-name spec))))))
+         ((or (null probe) (not (symbolp probe)) (eq probe name)) name)
+         ((and (fboundp probe) (autoloadp (symbol-function probe)))
+          (if (equal (file-name-base (cadr (symbol-function probe)))
+                     (symbol-name probe))
+              probe
+            name))
+         ((locate-library (symbol-name probe)) probe)
+         (t name)))))
 
 (defun cmdr-spec--queue-feature (feature name)
   "Wait for FEATURE on behalf of spec NAME."
@@ -444,13 +453,14 @@ Other variables are set via `set-default'."
               (cons name (delq name (map-elt cmdr-spec--pending-by-feature feature))))
     (add-hook 'after-load-functions #'cmdr-spec--after-load)))
 
-(defun cmdr-spec--activate-spec (name &optional force)
-  "Apply resources and activate NAME once, or again when FORCE is non-nil."
+(defun cmdr-spec--activate-spec (name &optional force resolved-feature)
+  "Apply resources and activate NAME once, or again when FORCE is non-nil.
+Use RESOLVED-FEATURE when the caller has already resolved it."
   (unless (map-elt cmdr-spec--activating name)
     (map-put! cmdr-spec--activating name t)
     (unwind-protect
         (let* ((spec (cmdr-spec-get name))
-               (feature (cmdr-spec--resolve-feature spec)))
+               (feature (or resolved-feature (cmdr-spec--resolve-feature spec))))
           (let ((missing (cmdr-spec--activate-keymap-bindings spec)))
             (cmdr-spec--activate-transient-suffixes spec)
             (when missing
@@ -517,6 +527,7 @@ Other variables are set via `set-default'."
                                 (map-elt cmdr-spec--installed (cmdr-spec-name item)))
                               cmdr-spec-table)))
     (map-delete cmdr-spec--activated (cmdr-spec-name spec))
+    (map-delete cmdr-spec--loaded-autoloads (cmdr-spec-name spec))
     (cmdr-spec-install (cmdr-spec-name spec))))
 
 ;;;###autoload
@@ -526,8 +537,11 @@ Installing again is idempotent."
   (interactive (list (intern (completing-read "Spec: " (seq-map #'cmdr-spec-name cmdr-spec-table) nil t))))
   (let ((spec (cmdr-spec-get name)))
     (seq-do (lambda (library)
-              (when (locate-library library)
-                (load library nil t)))
+              (unless (member library (map-elt cmdr-spec--loaded-autoloads name))
+                (when (locate-library library)
+                  (load library nil t)
+                  (map-put! cmdr-spec--loaded-autoloads name
+                            (cons library (map-elt cmdr-spec--loaded-autoloads name))))))
             (ensure-list (cmdr-spec-autoloads spec)))
     (seq-do (pcase-lambda (`(,key . ,label))
               (cmdr-keys-prefix cmdr-mode-map key label))
@@ -548,10 +562,13 @@ Installing again is idempotent."
       (cmdr-spec--apply-settings (cmdr-spec-settings spec)))
     (run-hooks (cmdr-spec--install-hook-name (cmdr-spec-name spec)))
     (let ((feature (cmdr-spec--resolve-feature spec)))
-      (when (and (symbol-value (cmdr-spec--activate-hook-name name))
+      (when (and (or (cmdr-spec-feature spec)
+                     (cmdr-spec-probe spec)
+                     (symbol-value (cmdr-spec--activate-hook-name name)))
+                 (not (map-elt cmdr-spec--activated name))
                  (not (eq feature 'none)) (not (featurep feature)))
-        (cmdr-spec--queue-feature feature name)))
-    (cmdr-spec--activate-spec name)
+        (cmdr-spec--queue-feature feature name))
+      (cmdr-spec--activate-spec name nil feature))
     (map-put! cmdr-spec--installed name t)
     spec))
 
