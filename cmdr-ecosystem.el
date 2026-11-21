@@ -187,5 +187,67 @@
   :settings ((ediff-window-setup-function . ediff-setup-windows-plain)
              (ediff-split-window-function . split-window-horizontally)))
 
+(autoload 'mailx-select-account "mailx" nil t)
+(autoload 'mailx-jump-to-tier "mailx-views" nil t)
+(autoload 'mailx-bulk-stage-current-view "mailx-bulk" nil t)
+(autoload 'mailx-capture-task "mailx-org" nil t)
+(autoload 'mailx-generate-refile-rule "mailx" nil t)
+(autoload 'mailx-sync-and-classify-async "mailx-org" nil t)
+(autoload 'mailx-compose-reply "mailx" nil t)
+
+(cmdr-register-spec
+  :name mailx
+  :probe mailx-select-account
+  :prefixes (("C-c m" . "mail"))
+  :bindings (("C-c m a" . mailx-select-account)
+             ("C-c m v" . mailx-jump-to-tier)
+             ("C-c m s" . mailx-bulk-stage-current-view)
+             ("C-c o c" . mailx-capture-task)
+             ("C-c m r" . mailx-generate-refile-rule)
+             ("C-c m u" . mailx-sync-and-classify-async))
+  :commands ((cmdr-spec-command :category mu4e
+                                :command mailx-select-account
+                                :display-name "mail-select-account"
+                                :description "select mail account"
+                                :transient-key "ma")
+             (cmdr-spec-command :category mu4e
+                                :command mailx-jump-to-tier
+                                :display-name "mail-jump-to-tier"
+                                :description "jump to attention tier"
+                                :transient-key "mv")
+             (cmdr-spec-command :category mu4e
+                                :command mailx-bulk-stage-current-view
+                                :display-name "mail-bulk-stage"
+                                :description "stage bulk triage plan"
+                                :transient-key "mb")
+             (cmdr-spec-command :category mu4e
+                                :command mailx-capture-task
+                                :display-name "mail-capture-task"
+                                :description "capture task from message"
+                                :transient-key "mt")
+             (cmdr-spec-command :category mu4e
+                                :command mailx-generate-refile-rule
+                                :display-name "mail-generate-refile-rule"
+                                :description "generate refile rule"
+                                :transient-key "mr")
+             (cmdr-spec-command :category mu4e
+                                :command mailx-sync-and-classify-async
+                                :display-name "mail-sync-and-classify"
+                                :description "sync and classify mail async"
+                                :transient-key "mu"))
+  :keymap-bindings
+  ((message message-mode-map
+    :bindings (("M-q" . ignore)))
+   (mu4e-compose mu4e-compose-minor-mode-map
+    :bindings (("R" . mailx-compose-reply)
+               ("<remap> <mu4e-context-switch>" . mu4e-compose-context-switch)))
+   (mu4e-headers mu4e-headers-mode-map
+    :bindings (("C-r" . mailx-compose-reply)
+               ("B" . mailx-bulk-stage-current-view)
+               ("c" . mailx-capture-task)
+               ("o" . mu4e-headers-mark-for-unread)
+               ("u" . mu4e-headers-mark-for-unread)
+               (";" . mu4e-mark-resolve-deferred-marks)))))
+
 (provide 'cmdr-ecosystem)
 ;;; cmdr-ecosystem.el ends here
