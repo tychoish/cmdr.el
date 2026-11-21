@@ -72,5 +72,21 @@
       (should (eq captured t))
       (should (eq select-enable-clipboard nil)))))
 
+(defvar mu4e-main-mode-hook nil)
+(defvar mu4e-headers-mode-hook nil)
+(defvar mu4e-view-mode-hook nil)
+(defvar mu4e-compose-mode-hook nil)
+
+(ert-deftest cmdr-ecosystem-test/mailx-activate-hooks-home-frames ()
+  (let ((mu4e-main-mode-hook nil)
+        (mu4e-headers-mode-hook nil)
+        (mu4e-view-mode-hook nil)
+        (mu4e-compose-mode-hook nil))
+    (cmdr-mailx--setup-home-frames)
+    (should (memq #'cmdr-frame-record-home-frame mu4e-main-mode-hook))
+    (should (memq #'cmdr-frame-record-home-frame mu4e-headers-mode-hook))
+    (should (memq #'cmdr-frame-record-home-frame mu4e-view-mode-hook))
+    (should (memq #'cmdr-frame-record-home-frame mu4e-compose-mode-hook))))
+
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
