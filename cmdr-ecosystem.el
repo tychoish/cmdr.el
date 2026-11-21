@@ -260,6 +260,7 @@
                (";" . mu4e-mark-resolve-deferred-marks)))))
 
 (autoload 'diff-review-find-file "diff-review" nil t)
+(autoload 'diff-review-magit-mode "diff-review-magit" nil t)
 (autoload 'magit-dash-review-select "magit-dash-review" nil t)
 (autoload 'magit-dash-review-send-to-agent "magit-dash-review" nil t)
 (autoload 'magit-dash-review-stage-hitl "magit-dash-review-hitl" nil t)
@@ -270,9 +271,15 @@
 (autoload 'magit-dash-review-sync "magit-dash-review" nil t)
 (autoload 'magit-dash-review-open-backend "magit-dash-review" nil t)
 
+(defun cmdr-diff-review--activate ()
+  "Enable `diff-review-magit-mode' when `diff-review' activates."
+  (when (fboundp 'diff-review-magit-mode)
+    (diff-review-magit-mode 1)))
+
 (cmdr-register-spec
   :name diff-review
   :probe diff-review-find-file
+  :activate-hook #'cmdr-diff-review--activate
   :bindings (("C-x g v" . magit-dash-review-select))
   :keymap-bindings
   ((diff-review diff-review-file-command-map
