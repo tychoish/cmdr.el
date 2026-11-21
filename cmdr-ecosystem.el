@@ -259,5 +259,36 @@
                ("u" . mu4e-headers-mark-for-unread)
                (";" . mu4e-mark-resolve-deferred-marks)))))
 
+(autoload 'diff-review-find-file "diff-review" nil t)
+(autoload 'magit-dash-review-select "magit-dash-review" nil t)
+(autoload 'magit-dash-review-send-to-agent "magit-dash-review" nil t)
+(autoload 'magit-dash-review-stage-hitl "magit-dash-review-hitl" nil t)
+(autoload 'magit-dash-review-critique-hunk "magit-dash-review" nil t)
+(autoload 'magit-dash-review-draft-test "magit-dash-review" nil t)
+(autoload 'magit-dash-review-promote-draft "magit-dash-review" nil t)
+(autoload 'magit-dash-review-submit "magit-dash-review" nil t)
+(autoload 'magit-dash-review-sync "magit-dash-review" nil t)
+(autoload 'magit-dash-review-open-backend "magit-dash-review" nil t)
+
+(cmdr-register-spec
+  :name diff-review
+  :probe diff-review-find-file
+  :bindings (("C-x g v" . magit-dash-review-select))
+  :keymap-bindings
+  ((diff-review diff-review-file-command-map
+    :bindings (("e" . magit-dash-review-send-to-agent)
+               ("h" . magit-dash-review-stage-hitl)
+               ("k" . magit-dash-review-critique-hunk)
+               ("T" . magit-dash-review-draft-test)
+               ("a" . magit-dash-review-promote-draft)
+               ("S" . magit-dash-review-submit)
+               ("F" . magit-dash-review-sync)))
+   (diff-review diff-review-mode-map
+    :bindings (("e" . magit-dash-review-send-to-agent)
+               ("h" . magit-dash-review-stage-hitl)
+               ("S" . magit-dash-review-submit)
+               ("F" . magit-dash-review-sync)
+               ("B" . magit-dash-review-open-backend)))))
+
 (provide 'cmdr-ecosystem)
 ;;; cmdr-ecosystem.el ends here

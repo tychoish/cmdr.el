@@ -96,6 +96,7 @@
     ("C-x g m t" . smerge-keep-current)
     ("C-x g m x" . execute-extended-smerge-command)
     ("C-x g s" . magit-status)
+    ("C-x g v" . magit-dash-review-select)
     ("C-x g x" . execute-extended-magit-command)
     ("C-x h" . mark-whole-buffer)
     ("C-x l" . goto-line)
