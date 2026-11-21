@@ -194,6 +194,7 @@
 (autoload 'mailx-generate-refile-rule "mailx" nil t)
 (autoload 'mailx-sync-and-classify-async "mailx-org" nil t)
 (autoload 'mailx-compose-reply "mailx" nil t)
+(autoload 'cmdr-frame-record-home-frame "cmdr-frame")
 
 (defun cmdr-mailx--setup-home-frames ()
   "Install `cmdr-frame-record-home-frame' on mu4e mode hooks."
