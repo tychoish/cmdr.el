@@ -214,6 +214,22 @@
       (fmakunbound 'cmdr-spec-test-autoload-probe)
       (fmakunbound 'cmdr-spec-test-other-probe))))
 
+(ert-deftest cmdr-spec-test/reinstall-activated-spec-skips-feature-resolution ()
+  "Do not search for an already activated spec's feature on reinstall."
+  (cmdr-spec-test--with-table
+    (let ((features (cons 'cmdr-spec-test-probe (copy-sequence features)))
+          (calls 0))
+      (cl-letf (((symbol-function 'cmdr-spec-test-probe) #'ignore)
+                ((symbol-function 'locate-library) (lambda (&rest _) "probe.el")))
+        (cmdr-register-spec :name active :probe cmdr-spec-test-probe)
+        (add-hook 'cmdr-spec-active-activate-hook (lambda () (cl-incf calls)))
+        (cmdr-spec-install 'active)
+        (should (= calls 1))
+        (cl-letf (((symbol-function 'locate-library)
+                   (lambda (&rest _) (ert-fail "Unexpected repeat library scan"))))
+          (cmdr-spec-install 'active))
+        (should (= calls 1))))))
+
 (ert-deftest cmdr-spec-test/autoloads-library-loaded-when-found ()
   (cmdr-spec-test--with-table
     (let* ((dir (make-temp-file "cmdr-autoloads" t))
@@ -325,6 +341,22 @@
 
 (defvar test-cmdr-spec--deferred-hook nil)
 (defvar test-cmdr-spec--deferred-map nil)
+
+(ert-deftest cmdr-spec-test/reinstall-activated-spec-installs-available-keymap ()
+  "Reinstalling an active spec still installs newly available keymaps."
+  (cmdr-spec-test--with-table
+    (let ((features (delq 'cmdr-spec-test-late-resource (copy-sequence features)))
+          (test-cmdr-spec--deferred-map nil))
+      (cmdr-register-spec :name active-resource :feature ert
+                          :keymap-bindings
+                          ((cmdr-spec-test-late-resource
+                            test-cmdr-spec--deferred-map ("d" . ignore))))
+      (cmdr-spec-install 'active-resource)
+      (should (map-elt cmdr-spec--activated 'active-resource))
+      (setq test-cmdr-spec--deferred-map (make-sparse-keymap))
+      (provide 'cmdr-spec-test-late-resource)
+      (cmdr-spec-install 'active-resource)
+      (should (eq (keymap-lookup test-cmdr-spec--deferred-map "d") #'ignore)))))
 
 (ert-deftest cmdr-spec-test/keymap-bindings-deferred-until-feature ()
   (cmdr-spec-test--with-table

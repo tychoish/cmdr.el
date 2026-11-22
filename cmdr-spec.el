@@ -561,7 +561,9 @@ Installing again is idempotent."
     (when (cmdr-spec-settings spec)
       (cmdr-spec--apply-settings (cmdr-spec-settings spec)))
     (run-hooks (cmdr-spec--install-hook-name (cmdr-spec-name spec)))
-    (let ((feature (cmdr-spec--resolve-feature spec)))
+    (let ((feature (if (map-elt cmdr-spec--activated name)
+                       'none
+                     (cmdr-spec--resolve-feature spec))))
       (when (and (or (cmdr-spec-feature spec)
                      (cmdr-spec-probe spec)
                      (symbol-value (cmdr-spec--activate-hook-name name)))
