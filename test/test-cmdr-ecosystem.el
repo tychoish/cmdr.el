@@ -105,5 +105,33 @@
     (should (eq (keymap-lookup diff-review-mode-map "F") #'magit-dash-review-sync))
     (should (eq (keymap-lookup diff-review-mode-map "B") #'magit-dash-review-open-backend))))
 
+(ert-deftest cmdr-ecosystem-test/grepx-spec-registered ()
+  "The grepx spec is registered with deferred keymap and activate hook."
+  (let ((spec (cmdr-spec-get 'grepx)))
+    (should spec)
+    (should (equal (cmdr-spec-feature spec) 'grepx))
+    (should (equal (cmdr-spec-activate-hook spec) '(grepx-mode)))
+    (should (equal (cmdr-spec-deferred-keymaps spec)
+                   '(("C-c g" grepx grepx-command-map "grepx"))))))
+
+(ert-deftest cmdr-ecosystem-test/telega-spec-registered ()
+  "The telega spec is registered with deferred keymaps and telegax activate hook."
+  (let ((spec (cmdr-spec-get 'telega)))
+    (should spec)
+    (should (equal (cmdr-spec-feature spec) 'telegax))
+    (should (equal (cmdr-spec-activate-hook spec) '(telegax-mode)))
+    (should (equal (cmdr-spec-deferred-keymaps spec)
+                   '(("C-c v" telegax telega-prefix-map "telega")
+                     ("C-c n" telegax telega-prefix-map "telega"))))))
+
+(ert-deftest cmdr-ecosystem-test/builder-spec-registered ()
+  "The builder spec is registered with compile binding and builder-mode activate hook."
+  (let ((spec (cmdr-spec-get 'builder)))
+    (should spec)
+    (should (equal (cmdr-spec-feature spec) 'builder-mode))
+    (should (equal (cmdr-spec-activate-hook spec) '(builder-mode)))
+    (should (equal (cmdr-spec-bindings spec)
+                   '(("C-c t c" . builder-compile))))))
+
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
