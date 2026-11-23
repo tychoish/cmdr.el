@@ -100,7 +100,7 @@
              ("C-c r s" . "agent-shell")
              ("C-c r s s" . "send"))
   :bindings (("C-c r p" . agent-shell-workflow-select)
-             ("C-c r m" . agent-shell-workflow-dispatch-menu)
+             ("C-c r m" . agent-shell-menu-dispatch)
              ("C-c r s o" . agent-shell)
              ("C-c r s t" . agent-shell-toggle)
              ("C-c r s b" . agent-shell-switch-buffer)
@@ -108,7 +108,7 @@
              ("C-c r s e" . agent-shell-new-temp-shell)
              ("C-c r s w" . agent-shell-new-worktree-shell)
              ("C-c r s p" . agent-shell-workflow-select)
-             ("C-c r s m" . agent-shell-workflow-dispatch-menu)
+             ("C-c r s m" . agent-shell-menu-dispatch)
              ("C-c r s a" . agent-shell-menu-select-action)
              ("C-c r s q" . agent-shell-queue-buffer-open)
              ("C-c r s /" . agent-shell-queue-capture)
@@ -124,7 +124,9 @@
   :keymap-bindings ((agent-shell agent-shell-mode-map
                      ("C-c j" . (cons "robot-agent-shell" (cmdr-keys-prefix cmdr-mode-map "C-c r s" "agent-shell")))
                      ("C-c C-c" . agent-shell-submit)
-                     ("C-c C-k" . agent-shell-interrupt))
+                     ("C-c C-k" . agent-shell-interrupt)
+                     ("C-c C-s" . agent-shell-steer)
+                     ("C-c s" . agent-shell-steer))
                     (agent-shell-queue agent-shell-queue-mode-map
                      ("C-c j" . (cons "robot-agent-shell" (cmdr-keys-prefix cmdr-mode-map "C-c r s" "agent-shell")))))
   :commands ((cmdr-spec-command :category agent-shell
