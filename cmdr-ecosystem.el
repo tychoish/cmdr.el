@@ -317,5 +317,22 @@
   :activate-hook #'builder-mode
   :bindings (("C-c t c" . builder-compile)))
 
+(declare-function orgx-fill-suppressed-p "orgx-fill")
+(defvar afp-suppress-fill-pfunction-list)
+
+(defun cmdr-fill--suppress-in-aggressive-fill ()
+  "Make `aggressive-fill-paragraph' honor the `orgx-fill' no-fill policy."
+  (require 'orgx-fill)
+  (add-to-list 'afp-suppress-fill-pfunction-list #'orgx-fill-suppressed-p))
+
+;; `orgx-fill-guard-mode' itself is enabled from the org and markdown mode
+;; hooks (see `sprite-state-mode-hooks'); this only wires aggressive filling.
+(cmdr-register-spec
+  :name fill
+  :doc "Keep aggressive filling out of headings, code blocks and drawers."
+  :probe orgx-fill-guard-mode
+  :feature aggressive-fill-paragraph
+  :activate-hook #'cmdr-fill--suppress-in-aggressive-fill)
+
 (provide 'cmdr-ecosystem)
 ;;; cmdr-ecosystem.el ends here

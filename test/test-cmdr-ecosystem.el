@@ -137,5 +137,27 @@
     (should (equal (cmdr-spec-bindings spec)
                    '(("C-c t c" . builder-compile))))))
 
+(defvar afp-suppress-fill-pfunction-list)
+
+(ert-deftest cmdr-ecosystem-test/fill-spec-registered ()
+  "The fill spec wires aggressive-fill-paragraph to the orgx-fill policy."
+  (let ((spec (cmdr-spec-get 'fill)))
+    (should spec)
+    (should (equal (cmdr-spec-feature spec) 'aggressive-fill-paragraph))
+    (should (equal (cmdr-spec-probe spec) 'orgx-fill-guard-mode))
+    (should (equal (cmdr-spec-activate-hook spec) '(cmdr-fill--suppress-in-aggressive-fill)))))
+
+(ert-deftest cmdr-ecosystem-test/fill-activation-registers-predicate ()
+  (let ((afp-suppress-fill-pfunction-list (list #'ignore))
+        (had-feature (featurep 'orgx-fill)))
+    (unwind-protect
+        (progn
+          (provide 'orgx-fill)
+          (cmdr-fill--suppress-in-aggressive-fill)
+          (cmdr-fill--suppress-in-aggressive-fill)
+          (should (equal afp-suppress-fill-pfunction-list '(orgx-fill-suppressed-p ignore))))
+      (unless had-feature
+        (setq features (delq 'orgx-fill features))))))
+
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
