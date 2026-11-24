@@ -28,6 +28,7 @@
 (make-read-extended-command-for-prefix "ollama")
 (make-read-extended-command-for-prefix "ollama-tailnet")
 (make-read-extended-command-for-prefix "tailscale")
+(make-read-extended-command-for-prefix "logx")
 
 (declare-function denote-dash-global-mode "denote-dash")
 (declare-function magit-dash-global-mode "magit-dash-global")
@@ -212,6 +213,14 @@
                                 :command orgx-find-heading
                                 :description "jump to org heading"
                                 :transient-key "oh")))
+
+(cmdr-register-spec
+  :name logx
+  :probe logx-show-logs
+  :feature logx-view
+  :bindings (("C-c t l" . logx-show-logs))
+  :keymap-bindings ((logx-view logx-view-mode-map
+                     ("x" . (cons "logx-commands" 'execute-extended-logx-command)))))
 
 (cmdr-register-spec
   :name sprite
