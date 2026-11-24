@@ -65,8 +65,11 @@
                                 :description "denote sequence hierarchy"
                                 :transient-key "ds")))
 
+;; `magit-dash-open' loads first and enables `magit-dash-global-mode', which
+;; leaves the main library to load on demand.  The `magit-dash' spec below
+;; fires once that library itself is loaded.
 (cmdr-register-spec
-  :name magit-dash
+  :name magit-dash-open
   :feature magit-dash-open
   :probe magit-dash-open
   :activate-hook #'magit-dash-global-mode
@@ -93,6 +96,11 @@
                                 :command magit-dash-sync-repo
                                 :description "sync one dashboard repo"
                                 :transient-key "ru")))
+
+(cmdr-register-spec
+  :name magit-dash
+  :doc "Hook point that fires once the full magit-dash library is loaded."
+  :feature magit-dash)
 
 (cmdr-register-spec
   :name agent-shell

@@ -187,10 +187,17 @@
     (should-not (cmdr-spec-test--bound-p "C-c z g"))
     (should (equal (cdr (assq 'gone cmdr-spec-skipped)) "library cmdr-no-such-library not found"))))
 
-(ert-deftest cmdr-spec-test/magit-dash-preserves-activation-feature ()
-  "The magit-dash integration retains its original activation feature."
-  (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'magit-dash))
+(ert-deftest cmdr-spec-test/magit-dash-open-preserves-activation-feature ()
+  "The magit-dash-open integration retains its original activation feature."
+  (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'magit-dash-open))
               'magit-dash-open)))
+
+(ert-deftest cmdr-spec-test/magit-dash-activates-on-core-library ()
+  "The magit-dash spec waits for the full library, not the open command."
+  (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'magit-dash))
+              'magit-dash))
+  (should (boundp 'cmdr-spec-magit-dash-activate-hook))
+  (should (boundp 'cmdr-spec-magit-dash-open-activate-hook)))
 
 (ert-deftest cmdr-spec-test/install-avoids-unnecessary-feature-lookups ()
   "Installing featureless, same-name, and autoload probes avoids disk scans."
