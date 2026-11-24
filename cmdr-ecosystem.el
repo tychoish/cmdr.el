@@ -325,6 +325,12 @@
   (require 'orgx-fill)
   (add-to-list 'afp-suppress-fill-pfunction-list #'orgx-fill-suppressed-p))
 
+(cmdr-register-spec
+  :name aggressive-fill
+  :doc "Only fill comments in programming modes."
+  :probe "aggressive-fill-paragraph"
+  :settings ((afp-fill-comments-only-mode-list prog-mode)))
+
 ;; `orgx-fill-guard-mode' itself is enabled from the org and markdown mode
 ;; hooks (see `sprite-state-mode-hooks'); this only wires aggressive filling.
 (cmdr-register-spec

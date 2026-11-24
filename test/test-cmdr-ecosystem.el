@@ -138,6 +138,7 @@
                    '(("C-c t c" . builder-compile))))))
 
 (defvar afp-suppress-fill-pfunction-list)
+(defvar afp-fill-comments-only-mode-list)
 
 (ert-deftest cmdr-ecosystem-test/fill-spec-registered ()
   "The fill spec wires aggressive-fill-paragraph to the orgx-fill policy."
@@ -158,6 +159,15 @@
           (should (equal afp-suppress-fill-pfunction-list '(orgx-fill-suppressed-p ignore))))
       (unless had-feature
         (setq features (delq 'orgx-fill features))))))
+
+(ert-deftest cmdr-ecosystem-test/aggressive-fill-spec-settings ()
+  "The aggressive-fill spec limits aggressive filling to comments in prog modes."
+  (let ((spec (cmdr-spec-get 'aggressive-fill))
+        (afp-fill-comments-only-mode-list '(emacs-lisp-mode sh-mode)))
+    (should spec)
+    (should (equal (cmdr-spec-probe spec) "aggressive-fill-paragraph"))
+    (cmdr-spec--apply-settings (cmdr-spec-settings spec))
+    (should (equal afp-fill-comments-only-mode-list '(prog-mode)))))
 
 (provide 'test-cmdr-ecosystem)
 ;;; test-cmdr-ecosystem.el ends here
