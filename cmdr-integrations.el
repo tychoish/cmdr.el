@@ -67,7 +67,7 @@
 
 ;; `magit-dash-open' loads first and enables `magit-dash-global-mode', which
 ;; leaves the main library to load on demand.  The `magit-dash' spec below
-;; fires once that library itself is loaded.
+;; holds the core-library commands and fires once that library is loaded.
 (cmdr-register-spec
   :name magit-dash-open
   :feature magit-dash-open
@@ -87,8 +87,14 @@
              (cmdr-spec-command :category magit-dash
                                 :command magit-dash-open-repo
                                 :description "magit open repo"
-                                :transient-key "rr")
-             (cmdr-spec-command :category magit-dash
+                                :transient-key "rr")))
+
+(cmdr-register-spec
+  :name magit-dash
+  :doc "Core magit-dash commands; activates once the full library is loaded."
+  :feature magit-dash
+  :probe magit-dash
+  :commands ((cmdr-spec-command :category magit-dash
                                 :command magit-dash-sync-all
                                 :description "sync all dashboard repos"
                                 :transient-key "rs")
@@ -96,11 +102,6 @@
                                 :command magit-dash-sync-repo
                                 :description "sync one dashboard repo"
                                 :transient-key "ru")))
-
-(cmdr-register-spec
-  :name magit-dash
-  :doc "Hook point that fires once the full magit-dash library is loaded."
-  :feature magit-dash)
 
 (cmdr-register-spec
   :name agent-shell

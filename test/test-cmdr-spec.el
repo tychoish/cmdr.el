@@ -196,6 +196,10 @@
   "The magit-dash spec waits for the full library, not the open command."
   (should (eq (cmdr-spec--resolve-feature (cmdr-spec-get 'magit-dash))
               'magit-dash))
+  (should (eq (cmdr-spec-probe (cmdr-spec-get 'magit-dash)) 'magit-dash))
+  (should (equal (seq-map #'cmdr-spec-command-command
+                          (cmdr-spec-commands (cmdr-spec-get 'magit-dash)))
+                 '(magit-dash-sync-all magit-dash-sync-repo)))
   (should (boundp 'cmdr-spec-magit-dash-activate-hook))
   (should (boundp 'cmdr-spec-magit-dash-open-activate-hook)))
 
