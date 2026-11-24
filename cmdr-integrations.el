@@ -29,6 +29,7 @@
 (make-read-extended-command-for-prefix "ollama-tailnet")
 (make-read-extended-command-for-prefix "tailscale")
 (make-read-extended-command-for-prefix "logx")
+(make-read-extended-command-for-prefix "mcpkit")
 
 (declare-function denote-dash-global-mode "denote-dash")
 (declare-function magit-dash-global-mode "magit-dash-global")
@@ -213,6 +214,23 @@
                                 :command orgx-find-heading
                                 :description "jump to org heading"
                                 :transient-key "oh")))
+
+(cmdr-register-spec
+  :name mcpkit
+  :probe mcpkit-menu
+  :feature mcpkit-menu
+  :prefixes (("C-c r" . "robot")
+             ("C-c r c" . "mcpkit"))
+  :bindings (("C-c r c c" . mcpkit-menu)
+             ("C-c r c l" . mcpkit-list-services)
+             ("C-c r c s" . mcpkit-start-service)
+             ("C-c r c k" . mcpkit-stop-service)
+             ("C-c r c i" . mcpkit-init-services)
+             ("C-c r c r" . mcpkit-restart-all-services)
+             ("C-c r c p" . mcpkit-show-endpoint)
+             ("C-c r c t" . mcpkit-stats-view-logs)
+             ("C-c r c x" . execute-extended-mcpkit-command))
+  :transient-suffixes ((mcpkit-menu (-1 -1 0) ("x" "extended mcpkit commands" execute-extended-mcpkit-command))))
 
 (cmdr-register-spec
   :name logx
