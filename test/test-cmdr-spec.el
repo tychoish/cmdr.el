@@ -203,6 +203,37 @@
   (should (boundp 'cmdr-spec-magit-dash-activate-hook))
   (should (boundp 'cmdr-spec-magit-dash-open-activate-hook)))
 
+(defvar cmdr-spec-magit-dash-activate-hook)
+(defvar cmdr-spec-test--magit-dash-registrations 0)
+
+(defun cmdr-spec-test--register-magit-dash-repositories ()
+  "Check that registration is available when the core spec activates."
+  (should (fboundp 'magit-dash-register))
+  (setq cmdr-spec-test--magit-dash-registrations
+        (1+ cmdr-spec-test--magit-dash-registrations)))
+
+(ert-deftest cmdr-spec-test/magit-dash-registration-waits-for-core-load ()
+  "Loading the open library cannot call unavailable core registration."
+  (let ((core (cmdr-spec-get 'magit-dash)))
+    (cmdr-spec-test--with-table
+      (let ((features (remq 'magit-dash (remq 'magit-dash-open features)))
+            (cmdr-spec-magit-dash-activate-hook
+             '(cmdr-spec-test--register-magit-dash-repositories))
+            (cmdr-spec-test--magit-dash-registrations 0))
+        (cl-letf (((symbol-function 'magit-dash-register) nil))
+          (setq cmdr-spec-table (list core))
+          (cmdr-spec-install 'magit-dash)
+          (should (= 0 cmdr-spec-test--magit-dash-registrations))
+          (push 'magit-dash-open features)
+          (cmdr-spec--after-load "magit-dash-open.el")
+          (should (= 0 cmdr-spec-test--magit-dash-registrations))
+          (fset 'magit-dash-register #'ignore)
+          (push 'magit-dash features)
+          (cmdr-spec--after-load "magit-dash.el")
+          (should (= 1 cmdr-spec-test--magit-dash-registrations))
+          (cmdr-spec--after-load "unrelated.el")
+          (should (= 1 cmdr-spec-test--magit-dash-registrations)))))))
+
 (ert-deftest cmdr-spec-test/install-avoids-unnecessary-feature-lookups ()
   "Installing featureless, same-name, and autoload probes avoids disk scans."
   (cmdr-spec-test--with-table
