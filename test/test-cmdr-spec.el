@@ -140,6 +140,7 @@
     (should (eq (keymap-lookup cmdr-mode-map "C-c r s n") #'agent-shell-new-shell))
     (should (eq (keymap-lookup cmdr-mode-map "C-c r m") #'agent-shell-menu-dispatch))
     (should (eq (keymap-lookup cmdr-mode-map "C-c r s m") #'agent-shell-menu-dispatch))
+    (should (eq (keymap-lookup cmdr-mode-map "C-c r s u") #'agent-shell-quota))
     (should (eq (keymap-lookup cmdr-mode-map "C-c m m") #'mu4e))))
 
 (ert-deftest cmdr-spec-test/elpaish-spec-registers-upgrade-command ()

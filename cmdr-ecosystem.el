@@ -145,6 +145,7 @@
                                           elpaish-status-mode
                                           elpaish-install-progress-mode
                                           agent-shell-queue-item-view-mode
+                                          agent-shell-quota-mode
                                           ert-results-mode
                                           help-mode
                                           message-mode
@@ -251,6 +252,7 @@
                (";" . mu4e-mark-resolve-deferred-marks)))))
 
 (autoload 'agent-shell-switch-buffer "agent-shell" nil t)
+(autoload 'agent-shell-quota "agent-shell-quota" nil t)
 (autoload 'diff-review-find-file "diff-review" nil t)
 (autoload 'diff-review-magit-mode "diff-review-magit" nil t)
 (autoload 'magit-dash-review-select "magit-dash-review" nil t)

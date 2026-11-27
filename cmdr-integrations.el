@@ -106,7 +106,8 @@
 (cmdr-register-spec
   :name agent-shell
   :probe agent-shell
-  :settings ((popper-reference-buffers . (agent-shell-queue-item-view-mode)))
+  :settings ((popper-reference-buffers . (agent-shell-queue-item-view-mode
+                                          agent-shell-quota-mode)))
   :prefixes (("C-c r" . "robot")
              ("C-c r s" . "agent-shell")
              ("C-c r s s" . "send"))
@@ -123,6 +124,7 @@
              ("C-c r s a" . agent-shell-menu-select-action)
              ("C-c r s r" . agent-shell-menu-restart)
              ("C-c r s q" . agent-shell-queue-buffer-open)
+             ("C-c r s u" . agent-shell-quota)
              ("C-c r s /" . agent-shell-queue-capture)
              ("C-c r s x" . execute-extended-agent-shell-command)
              ("C-c r s s d" . agent-shell-send-dwim)
